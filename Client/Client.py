@@ -12,7 +12,7 @@ clientSocket.connect((serverName, serverPort))
 message = "" 
 
 while message != "/quit":
-    message = input("Enter your message:")
+    message = input("Enter your message:\n")
     clientSocket.send(message.encode())
     response = clientSocket.recv(1024).decode()
     print(response)

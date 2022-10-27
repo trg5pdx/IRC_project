@@ -11,18 +11,17 @@ serverPort = 45876
 serverSocket.bind(('', serverPort))
 serverSocket.listen(1)
 
-print("Ready to accept connections")
+print("Ready to accept connections\n")
 connectionSocket, addr = serverSocket.accept()
 message = ""
 
 while message != "/quit":
-    message = connectionSocket.recv(1024).decode()
-    print(message)
-    sentence = input("Enter your response:")
-    connectionSocket.send(sentence.encode())
+    response = connectionSocket.recv(1024).decode()
+    print(response)
+    message = input("Enter your response:\n")
+    connectionSocket.send(message.encode()) 
+    if message == "/quit":
+        connectionSocket.send("Connection shutting off...\n".encode())
+        serverSocket.close()
 
-if message == "/quit":
-    connectionSocket.send("Connection shutting off...".encode())
-
-serverSocket.close()
 sys.exit()

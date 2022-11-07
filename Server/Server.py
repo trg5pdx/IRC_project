@@ -15,8 +15,7 @@ import threading
 queue = []
 lock = threading.Condition()
 
-def handler(client_socket):
-    print("ping")
+def process_client_data(client_socket):
     response = ""
     with client_socket:
         while response != "/quit":
@@ -31,17 +30,14 @@ def handler(client_socket):
                 client_socket.close()
             else:
                 lock.acquire()
-                print(response)
-                print("lock acquired")
                 queue.append(response)
                 client_socket.send("message received".encode())
                 lock.release()
-                print("lock freed")
 
 def accept_connections(server_socket):
     while True:
         connection_socket, addr = server_socket.accept()
-        threading.Thread(target=handler, args=(connection_socket,), daemon=True).start() 
+        threading.Thread(target=process_client_data, args=(connection_socket,), daemon=True).start() 
 
 def print_help():
     print("/help: prints this menu")

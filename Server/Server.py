@@ -19,10 +19,6 @@ def process_client_data(client_socket):
     response = ""
     with client_socket:
         while response != "/quit":
-            if len(queue) > 0:
-                for i in queue:
-                    i = i + "\n"
-                    client_socket.send(i.encode())
             response = client_socket.recv(1024).decode()
 
             if response == "/quit":
@@ -31,12 +27,30 @@ def process_client_data(client_socket):
             else:
                 lock.acquire()
                 queue.append(response)
-                client_socket.send("message received".encode())
                 lock.release()
+
+def send_message_history(client_socket):
+    if len(queue) > 0:
+        for i in queue:
+            i = i + "\n"
+            client_socket.send(i.encode())
+    return len(queue)
+
+def send_new_messages(client_socket, printed):
+    while True:
+        if len(queue) > printed:
+            i = printed
+            lock.acquire()
+            while i < len(queue):
+                client_socket.send(queue[i].encode())
+                i += 1
+            lock.release()
 
 def accept_connections(server_socket):
     while True:
         connection_socket, addr = server_socket.accept()
+        printed = send_message_history(connection_socket)
+        # threading.Thread(target=send_new_messages, args=(connection_socket, printed,), daemon=True).start() 
         threading.Thread(target=process_client_data, args=(connection_socket,), daemon=True).start() 
 
 def print_help():

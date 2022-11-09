@@ -3,19 +3,30 @@
 
 from socket import *
 import sys
+import threading
+import readline
 
-clientSocket = socket(AF_INET, SOCK_STREAM)
-serverPort = 45876 
-serverName = 'localhost'
-clientSocket.connect((serverName, serverPort))
+def receive_server_responses(client_socket):
+    while True:
+        message = client_socket.recv(1024).decode()
+        print(message)
 
-message = "" 
 
-while message != "/quit":
-    message = input("Enter your message:\n")
-    clientSocket.send(message.encode())
-    response = clientSocket.recv(1024).decode()
-    print(response)
+def main():
+    client_socket = socket(AF_INET, SOCK_STREAM)
+    server_port = 45876 
+    server_name = 'localhost'
+    client_socket.connect((server_name, server_port))
+    
+    threading.Thread(target=receive_server_responses, args=(client_socket,), daemon=True).start()
 
-clientSocket.close()
-sys.exit()
+    message = "" 
+    while message != "/quit":
+        message = input("Enter your message:\n")
+        client_socket.send(message.encode())
+
+    client_socket.close()
+    sys.exit()
+
+if __name__ == '__main__':
+    main()

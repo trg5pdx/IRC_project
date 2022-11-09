@@ -5,6 +5,7 @@
 from socket import *
 import sys
 import threading
+from Connections import *
 
 # Following the stackoverflow post below for handling multiple connections
 # https://stackoverflow.com/questions/61911301/handling-multiple-connections-in-python-with-sockets
@@ -15,43 +16,13 @@ import threading
 queue = []
 lock = threading.Condition()
 
-def process_client_data(client_socket):
-    response = ""
-    with client_socket:
-        while response != "/quit":
-            response = client_socket.recv(1024).decode()
-
-            if response == "/quit":
-                client_socket.send("disconnecting...".encode())
-                client_socket.close()
-            else:
-                lock.acquire()
-                queue.append(response)
-                lock.release()
-
-def send_message_history(client_socket):
-    if len(queue) > 0:
-        for i in queue:
-            i = i + "\n"
-            client_socket.send(i.encode())
-    return len(queue)
-
-def send_new_messages(client_socket, printed):
-    while True:
-        if len(queue) > printed:
-            i = printed
-            lock.acquire()
-            while i < len(queue):
-                client_socket.send(queue[i].encode())
-                i += 1
-            lock.release()
-
 def accept_connections(server_socket):
     while True:
         connection_socket, addr = server_socket.accept()
-        printed = send_message_history(connection_socket)
-        # threading.Thread(target=send_new_messages, args=(connection_socket, printed,), daemon=True).start() 
-        threading.Thread(target=process_client_data, args=(connection_socket,), daemon=True).start() 
+        client = connections(connection_socket)
+        client.send_message_history(queue)
+        threading.Thread(target=client.send_new_messages, args=(queue,), daemon=True).start() 
+        threading.Thread(target=client.receive_message, args=(queue, lock,), daemon=True).start() 
 
 def print_help():
     print("/help: prints this menu")
@@ -60,9 +31,16 @@ def print_help():
 
 def main():
     server_socket = socket(AF_INET, SOCK_STREAM)
-
-    server_port = 45876 
+    
+    # default server host and port if none are specified
     server_host = 'localhost'
+    server_port = 45876 
+    
+    if len(sys.argv) > 1 and len(sys.argv) < 4:
+        server_host = sys.argv[1]
+        server_port = int(sys.argv[2])
+        print("server host and port set at commandline")
+
     server_socket.bind((server_host, server_port))
     server_socket.listen(1)
 

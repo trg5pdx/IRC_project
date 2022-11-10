@@ -19,7 +19,14 @@ lock = threading.Condition()
 def accept_connections(server_socket):
     while True:
         connection_socket, addr = server_socket.accept()
-        client = connections(connection_socket)
+        initial_client_command = connection_socket.recv(1024).decode()
+        command = initial_client_command.split()
+        # Come back and add error handling for when a client would send the wrong command
+        name = command[1]
+        name_ack = "Welcome " + name + " to the IRC server!\n"
+        connection_socket.send(name_ack.encode()) 
+
+        client = connections(name, connection_socket)
         client.send_message_history(queue)
         threading.Thread(target=client.send_new_messages, args=(queue,), daemon=True).start() 
         threading.Thread(target=client.receive_message, args=(queue, lock,), daemon=True).start() 

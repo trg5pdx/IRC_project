@@ -25,6 +25,11 @@ def main():
     client_socket.connect((server_name, server_port))
     
     threading.Thread(target=receive_server_responses, args=(client_socket,), daemon=True).start()
+    
+    name = input("Enter your name:\n")
+    connection_message = "CONNCT " + name 
+
+    client_socket.send(connection_message.encode())
 
     message = "" 
     while message != "/quit":

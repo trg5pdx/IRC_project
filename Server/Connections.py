@@ -2,8 +2,8 @@ from socket import *
 import threading
 
 class connections:
-    def __init__(self, client_socket):
-        self.name = ""
+    def __init__(self, name, client_socket):
+        self.name = name
         self.rooms = []
         self.client_socket = client_socket
 
@@ -37,5 +37,7 @@ class connections:
                     self.client_socket.close()
                 else:
                     lock.acquire()
-                    queue.append(response)
+                    print(type(self.name))
+                    sent_message = str(self.name) + ": " + str(response)
+                    queue.append(sent_message)
                     lock.release()

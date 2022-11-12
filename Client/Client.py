@@ -32,9 +32,40 @@ def main():
     client_socket.send(connection_message.encode())
 
     message = "" 
-    while message != "/quit":
-        message = input("Enter your message:\n")
-        client_socket.send(message.encode())
+    
+    quitting = False
+
+    while not quitting:
+        message = input()
+
+        if message[0] == "/":
+            user_command = message.split()
+            
+            match user_command[0]:
+                case "/help":
+                    client_socket.send("HELP".encode())
+                case "/listcr":
+                    client_socket.send("LISTCR".encode())
+                case "/joincr":
+                    if len(user_command) > 1:
+                        client_command = "JOINCR " + user_command[1]
+                        client_socket.send(client_command.encode())
+                    else:
+                        print("Incorrect number of arguments")
+                case "/leavecr":
+                    if len(user_command) > 1:
+                        client_command = "LEAVCR " + user_command[1]
+                        client_socket.send(client_command.encode())
+                    else:
+                        print("Incorrect number of arguments")
+                case "/quit":
+                    client_socket.send("DSCTSV".encode())
+                    print("Disconnecting...")
+                    quitting = True
+
+        else:
+            client_socket.send(message.encode())
+
 
     client_socket.close()
     sys.exit()

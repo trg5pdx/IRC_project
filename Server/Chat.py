@@ -13,19 +13,16 @@ class room:
         self.userlist.append((time.time(), username))
     
     def leave_chatroom(self, username):
-        try:
-            print(self.userlist)
-            self.userlist.remove(username)
-            print(self.userlist)
-            return True
-        except:
-            return False
+        for i in range(len(self.userlist)): 
+            if self.userlist[i][1] == username:
+                del self.userlist[i]
+                return True
+        return False
 
     def list_connected_users(self):
         user_list = ""
         for i in self.userlist:
             # Not printing time atm, come back and print it formatted
-            print(i)
             current = i[1] + "\n"
             user_list += current
         return user_list

@@ -46,6 +46,10 @@ def main():
                     client_socket.send("HELP".encode())
                 case "/listcr":
                     client_socket.send("LISTCR".encode())
+                case "/create":
+                    if len(user_command) > 1:
+                        client_command = "CREATE " + user_command[1]
+                        client_socket.send(client_command.encode())
                 case "/joincr":
                     if len(user_command) > 1:
                         client_command = "JOINCR " + user_command[1]
@@ -58,8 +62,18 @@ def main():
                         client_socket.send(client_command.encode())
                     else:
                         print("Incorrect number of arguments")
+                case "/send":
+                    if len(user_command) > 2:
+                        client_command = "MSGCHR " + user_command[1] + "\n"
+                        for i in range(2, len(user_command)):
+                            word = user_command[i] + " "
+                            client_command += word
+                        client_socket.send(client_command.encode())
+                    else:
+                        print("Incorrect number of arguments")
+
                 case "/quit":
-                    client_socket.send("DSCTSV".encode())
+                    client_socket.send("DSCTCL".encode())
                     print("Disconnecting...")
                     quitting = True
 

@@ -39,6 +39,7 @@ def print_help():
 /create <name>: creates a chatroom with the specified name
 /listcr: lists the currently open chatrooms
 /joincr <name>: join the chatroom with the specified name
+/send <chatroom name> <message>: send a message to a specific chatroom
 /leavecr <name>: leave the chatroom with the specified name
 /quit: closes the server"""
 

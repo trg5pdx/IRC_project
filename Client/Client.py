@@ -32,7 +32,7 @@ def main():
     client_socket.send(connection_message.encode())
 
     message = "" 
-    
+    default_room = ""
     quitting = False
 
     while not quitting:
@@ -45,7 +45,7 @@ def main():
                 case "/help":
                     client_socket.send("HELP".encode())
                 case "/listcr":
-                    client_socket.send("LISTCR".encode())
+                    client_socket.send("LISTCR YES".encode())
                 case "/create":
                     if len(user_command) > 1:
                         client_command = "CREATE " + user_command[1]
@@ -71,14 +71,28 @@ def main():
                         client_socket.send(client_command.encode())
                     else:
                         print("Incorrect number of arguments")
-
+                case "/default":
+                    if len(user_command) > 1:
+                        default_room = user_command[1]
+                    # Getting the chatroom list and checking if the room the user provided is there
+                    client_socket.send("LISTCR NO".encode())
+                    server_resp = client_socket.recv(1024).decode()
+                    room_list = server_resp.split(";") 
+                    for i in room_list:
+                        chatroom = i.split(":")
+                        if chatroom[0] == user_command[1]:
+                            default_room = chatroom[0]                         
+                     
                 case "/quit":
                     client_socket.send("DSCTCL".encode())
                     print("Disconnecting...")
                     quitting = True
-
+        # Redo this to make it more clear; currently checks if the default rooms been set
+        elif default_room:
+            client_command = "MSGCHR " + default_room + "\n" + message
+            client_socket.send(client_command.encode())
         else:
-            client_socket.send(message.encode())
+            print("Entered invalid input")
 
 
     client_socket.close()

@@ -16,12 +16,15 @@ class connections:
 
     def send_message_history(self, server_chatrooms, room_name):
         for current_room in server_chatrooms:
-            if current_room.name == room_name and len(current_room.history) > 0:
+            if current_room.name == room_name:
                 self.rooms.append([room_name, 0])
-                for current_message in current_room.history:
-                    message = current_message + "\n"
-                    self.client_socket.send(message.encode())
-                    self.rooms[-1][1] += 1              
+                if len(current_room.history) > 0:
+                    i = 0
+                    for current_message in current_room.history:
+                        message = "[" + room_name + "]" + current_message
+                        self.client_socket.send(message.encode())
+                        i += 1
+                    self.rooms[-1][1] = i 
 
     def send_new_messages(self, server_chatrooms):
         while True:
@@ -30,7 +33,8 @@ class connections:
                     if user_room[0] == rooms.name and len(rooms.history) > user_room[1]:
                         i = user_room[1]
                         while i < len(rooms.history):
-                            self.client_socket.send(rooms.history[i].encode())
+                            user_message = "[" + rooms.name + "]" + rooms.history[i]
+                            self.client_socket.send(user_message.encode())
                             i += 1
                         user_room[1] = i
 
@@ -48,8 +52,20 @@ class connections:
                         help_message = print_help()
                         self.client_socket.send(help_message.encode())
                     case "LISTCR":
-                        rooms = list_rooms(server_chatrooms)
-                        self.client_socket.send(rooms.encode())
+                        if len(client_command) > 1: 
+                            fancy_option = client_command[1]
+                            fancy = True
+                            
+                            if fancy_option == "YES":
+                                fancy = True
+                            else:
+                                fancy = False
+
+                            rooms = list_rooms(server_chatrooms, fancy)
+                            self.client_socket.send(rooms.encode())
+                        else:
+                            rooms = list_rooms(server_chatrooms, True)
+                            self.client_socket.send(rooms.encode())
                     case "CREATE":
                         if len(client_command) > 1:
                             new_room_name = client_command[1]
@@ -71,6 +87,9 @@ class connections:
                                     left = i.leave_chatroom(self.name)
                                     if left:
                                         self.rooms.remove(client_command[1])
+                                        left_msg = self.name + " has disconnected from: " + i.name
+                                        i.history.append(left_msg)
+
                                     else:
                                         self.client_socket.send("Unknown room name\n".encode())
                                     lock.release()
@@ -94,6 +113,9 @@ class connections:
                                     if not left:
                                         print("failed to leave chatroom")
                                         print(j.userlist)
+                                    else:
+                                        left_msg = self.name + " has disconnected from: " + j.name
+                                        j.history.append(left_msg)
                         lock.release()
                         self.rooms = []
                         self.client_socket.close()

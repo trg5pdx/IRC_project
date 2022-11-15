@@ -33,12 +33,14 @@ def add_new_room(server_chatrooms, lock, name):
     server_chatrooms.append(new_chatroom)
     lock.release()
 
-def list_rooms(server_chatrooms):
+def list_rooms(server_chatrooms, fancy):
     chat_list = ""
 
     for i in server_chatrooms:
-        print(i.userlist)
-        current = i.name + ": " + str(len(i.userlist)) + " users connected" + "\n"
+        if fancy:
+            current = i.name + ": " + str(len(i.userlist)) + " users connected" + "\n"
+        else:
+            current = i.name + ":" + str(len(i.userlist)) + ";"
         chat_list += current
 
     return chat_list

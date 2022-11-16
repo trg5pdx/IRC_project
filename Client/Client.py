@@ -62,6 +62,23 @@ def main():
                         client_socket.send(client_command.encode())
                     else:
                         print("Incorrect number of arguments")
+                case "/listusers":
+                    if len(user_command) > 1:
+                        client_command = "LISTME REQUEST " + user_command[1] + "\n"
+                        client_socket.send(client_command.encode())
+                        server_resp = client_socket.recv(1024).decode()
+                        user_list = server_resp.split(";")
+                        formatted_user_list = ""
+
+                        for i in user_list:
+                            if i == user_list[-1]:
+                                formatted_user_list += i
+                            else:
+                                current = i + ", "
+                                formatted_user_list += current
+                        print("Users currently connected to " + user_command[1])
+                        print(formatted_user_list)
+
                 case "/send":
                     if len(user_command) > 2:
                         client_command = "MSGCHR " + user_command[1] + "\n"

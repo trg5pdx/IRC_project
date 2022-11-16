@@ -23,8 +23,11 @@ class room:
         user_list = ""
         for i in self.userlist:
             # Not printing time atm, come back and print it formatted
-            current = i[1] + "\n"
-            user_list += current
+            if i == self.userlist[-1]:
+                user_list += i[1]
+            else:
+                current = i[1] + ";"
+                user_list += current
         return user_list
 
 def add_new_room(server_chatrooms, lock, name):

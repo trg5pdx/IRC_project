@@ -9,7 +9,7 @@ class connections:
         self.rooms = []
         self.client_socket = client_socket
 
-    def send_new_messages(self, server_chatrooms):
+    def send_messages(self, server_chatrooms):
         while True:
             for rooms in server_chatrooms:
                 for user_room in self.rooms:
@@ -60,6 +60,12 @@ class connections:
                                 if i.name == client_command[1]:
                                     i.join_chatroom(self.name)
                                     self.rooms.append([i.name, 0])
+                    case "LISTME":
+                        if len(client_command) > 2 and client_command[1] == "REQUEST":
+                            for i in server_chatrooms:
+                                if client_command[2] == i.name:
+                                    users = i.list_connected_users()
+                                    self.client_socket.send(users.encode())
                     case "LEAVCR":
                         if len(client_command) > 1:
                             for i in server_chatrooms:

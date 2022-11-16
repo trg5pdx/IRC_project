@@ -28,8 +28,8 @@ def accept_connections(server_socket, server_chatrooms):
         connection_socket.send(name_ack.encode()) 
 
         client = connections(name, connection_socket)
-        threading.Thread(target=client.send_new_messages, args=(server_chatrooms,), daemon=True).start() 
-        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock,), daemon=True).start() 
+        threading.Thread(target=client.send_messages, args=(server_chatrooms,), daemon=True).start() 
+        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock,), daemon=True).start()
 
 def print_help():
     return """
@@ -38,6 +38,7 @@ def print_help():
 /create <name>: creates a chatroom with the specified name
 /listcr: lists the currently open chatrooms
 /joincr <name>: join the chatroom with the specified name
+/listusers <chatroom name>: lists the users currently in a chatroom
 /send <chatroom name> <message>: send a message to a specific chatroom
 /leavecr <name>: leave the chatroom with the specified name
 /quit: closes the server"""
@@ -83,7 +84,7 @@ def main():
                 chatlist = list_rooms(server_chatrooms)
                 print("List of currently open chatrooms:\n")
                 print(chatlist)
-            case "/listme":
+            case "/listusers":
                 if len(given_command) > 1:
                     current_room = given_command[1]
                     user_list = list_connected_users(server_chatrooms, current_room)

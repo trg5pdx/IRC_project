@@ -28,7 +28,6 @@ def accept_connections(server_socket, server_chatrooms):
         connection_socket.send(name_ack.encode()) 
 
         client = connections(name, connection_socket)
-        # client.send_message_history(queue)
         threading.Thread(target=client.send_new_messages, args=(server_chatrooms,), daemon=True).start() 
         threading.Thread(target=client.receive_message, args=(server_chatrooms, lock,), daemon=True).start() 
 

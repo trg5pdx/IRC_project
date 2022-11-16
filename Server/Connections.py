@@ -8,23 +8,6 @@ class connections:
         self.name = name
         self.rooms = []
         self.client_socket = client_socket
-        """
-        will be used later for allowing a client to send messages without a command
-        to a set default chatroom
-        """
-        self.default_room = ""
-
-    def send_message_history(self, server_chatrooms, room_name):
-        for current_room in server_chatrooms:
-            if current_room.name == room_name:
-                self.rooms.append([room_name, 0])
-                if len(current_room.history) > 0:
-                    i = 0
-                    for current_message in current_room.history:
-                        message = "[" + room_name + "]" + current_message
-                        self.client_socket.send(message.encode())
-                        i += 1
-                    self.rooms[-1][1] = i 
 
     def send_new_messages(self, server_chatrooms):
         while True:
@@ -72,13 +55,11 @@ class connections:
                             add_new_room(server_chatrooms, lock, new_room_name)
                     case "JOINCR":
                         if len(client_command) > 1:
-                            current_room = client_command[1]
                             # Come back and improve the error handling here
                             for i in server_chatrooms:
-                                if i.name == current_room:
+                                if i.name == client_command[1]:
                                     i.join_chatroom(self.name)
-                                    self.rooms.append(current_room)
-                            self.send_message_history(server_chatrooms, current_room)
+                                    self.rooms.append([i.name, 0])
                     case "LEAVCR":
                         if len(client_command) > 1:
                             for i in server_chatrooms:

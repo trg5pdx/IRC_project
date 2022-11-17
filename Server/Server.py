@@ -21,11 +21,26 @@ def accept_connections(server_socket, server_chatrooms):
     while True:
         connection_socket, addr = server_socket.accept()
         initial_client_command = connection_socket.recv(1024).decode()
-        command = initial_client_command.split()
+        command = initial_client_command.splitlines()
+        name = ""
         # Come back and add error handling for when a client would send the wrong command
-        name = command[1]
-        name_ack = "Welcome " + name + " to the IRC server!\n"
-        connection_socket.send(name_ack.encode()) 
+        if command[0] == "trgIRC/0.1 CONNCT CLIENT":
+            username_line = command[1].split()
+            if username_line[0] == "USERNAME":
+                name = username_line[1]
+                name_ack = "trgIRC/0.1 CONNCT OK\n"
+                name_ack += "MESSAGE\n"
+                name_ack += "\nWelcome " + name + " to the IRC server!\n\n"
+                connection_socket.send(name_ack.encode()) 
+            else:
+                message = "trgIRC/0.1 CONNCT ERROR\n"
+                message += "ERROR HEADER\n"
+                connection_socket.send(message.encode())
+
+        else:
+            message = "trgIRC/0.1 CONNCT ERROR\n"
+            message += "ERROR STATUS\n"
+            connection_socket.send(message.encode())
 
         client = connections(name, connection_socket)
         threading.Thread(target=client.send_messages, args=(server_chatrooms,), daemon=True).start() 

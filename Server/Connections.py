@@ -16,7 +16,12 @@ class connections:
                     if user_room[0] == rooms.name and len(rooms.history) > user_room[1]:
                         i = user_room[1]
                         while i < len(rooms.history):
-                            user_message = "[" + rooms.name + "]" + rooms.history[i]
+                            user_message = "trgIRC/0.1 MSGCHR RECV\n"
+                            user_message += "USERNAME " + rooms.history[i][1] + "\n"
+                            user_message += "TIME " + str(rooms.history[i][0]) + "\n"
+                            user_message += "ROOM " + rooms.name + "\n" 
+                            user_message += "MESSAGE\n"
+                            user_message += rooms.history[i][2]
                             self.client_socket.send(user_message.encode())
                             i += 1
                         user_room[1] = i
@@ -85,7 +90,9 @@ class connections:
                             for i in server_chatrooms:
                                 if client_command[1] == i.name:
                                     lock.acquire()
-                                    sent_message = self.name + ": " + packet_lines[1]
+                                    # Come back and have this add up all of the packet lines
+                                    # after a certain point into one string to send as a message
+                                    sent_message = [time.time(), self.name, packet_lines[1]]
                                     i.history.append(sent_message) 
                                     lock.release()
                     case "MSGCRS":

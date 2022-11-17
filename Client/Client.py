@@ -4,13 +4,7 @@
 from socket import *
 import sys
 import threading
-import readline
-
-def receive_server_responses(client_socket):
-    while True:
-        message = client_socket.recv(1024).decode()
-        print(message)
-
+from Receive import *
 
 def main():
     client_socket = socket(AF_INET, SOCK_STREAM)
@@ -27,7 +21,8 @@ def main():
     threading.Thread(target=receive_server_responses, args=(client_socket,), daemon=True).start()
     
     name = input("Enter your name:\n")
-    connection_message = "CONNCT " + name 
+    connection_message = "trgIRC/0.1 CONNCT CLIENT\n"
+    connection_message += "USERNAME " + name + "\n"
 
     client_socket.send(connection_message.encode())
 

@@ -25,86 +25,152 @@ class connections:
                             self.client_socket.send(user_message.encode())
                             i += 1
                         user_room[1] = i
-
+    
+    """
+    NOTE: currently editing to handle packet format, running it right now will probably fail until every part of this
+    has been fully updated to account for the new packet format
+    """
     def receive_message(self, server_chatrooms, lock):
         response = ""
+        disconnecting = False
+
+        # Flags for processing incoming packets, primarily for telling function
+        # how to interpret header lines and the message attached
+        msgchr = False
+        msgchrs = False
 
         with self.client_socket:
-            while response != "DSCTCL":
+            while not disconnecting: 
                 response = self.client_socket.recv(1024).decode()
                 packet_lines = response.splitlines()
                 client_command = packet_lines[0].split()
+                
+                if client_command[0] == "trgIRC/0.1":
+                    continue
+                else:
+                    # Come back to the error on this was, just used other since I didn't have anything else in mind
+                    # for telling the client the packet format was incorrect
+                    error_message = "trgIRC/0.1 OTHER ERROR\n"
+                    error_message += "ERROR FORMAT\n"
+                    self.client_socket.send(error_message.encode())
 
-                match client_command[0]:
+                match client_command[1]:
                     case "HELP":
+                        help_message = "trg5IRC HELP OK\n"
+                        help_message += "MESSAGE\n"
                         help_message = print_help()
                         self.client_socket.send(help_message.encode())
                     case "LISTCR":
-                        if len(client_command) > 1: 
-                            fancy_option = client_command[1]
+                        rooms = "" 
+                        fancy = False
+                        # Look at having list_rooms throw an exception when there aren't any rooms
+                        if len(client_command) > 3 and client_command[2] == "YES":
+                            rooms += list_rooms(server_chatrooms, True) 
                             fancy = True
-                            
-                            if fancy_option == "YES":
-                                fancy = True
-                            else:
-                                fancy = False
-
-                            rooms = list_rooms(server_chatrooms, fancy)
-                            self.client_socket.send(rooms.encode())
                         else:
-                            rooms = list_rooms(server_chatrooms, True)
-                            self.client_socket.send(rooms.encode())
+                            rooms += list_rooms(server_chatrooms, False)
+                        output = "trgIRC/0.1 LISTCR OK\n"
+                        if fancy:
+                            output += "FANCY TRUE\n"
+                        else:
+                            output += "FANCY FALSE\n"
+                        output += "MESSAGE\n"
+                        output += rooms
+                        self.client_socket.send(output.encode())
                     case "CREATE":
-                        if len(client_command) > 1:
-                            new_room_name = client_command[1]
-                            add_new_room(server_chatrooms, lock, new_room_name)
+                        if len(client_command) > 2:
+                            new_room_name = client_command[2]
+                            created = add_new_room(server_chatrooms, lock, new_room_name)
+                            output = ""
+                            if created:
+                                output = "trgIRC/0.1 CREATE OK\n"
+                            else:
+                                output = "trgIRC/0.1 CREATE ERROR\n"
+                                output += "ERROR ROOMEXISTS\n"
+                            self.client_socket.send(output.encode())
                     case "JOINCR":
+                        joined = False
                         if len(client_command) > 1:
                             # Come back and improve the error handling here
                             for i in server_chatrooms:
                                 if i.name == client_command[1]:
                                     i.join_chatroom(self.name)
                                     self.rooms.append([i.name, 0])
+                                    joined = True
+
+                        if joined:
+                            output = "trgIRC/0.1 JOINCR OK\n"
+                            self.client_socket.send(output.encode())
+                        else:
+                            output = "trgIRC/0.1 JOINCR ERROR\n"
+                            output += "ERROR NOTFOUND\n"
+                            self.client_socket.send(output.encode())
+
                     case "LISTME":
+                        found = False
                         if len(client_command) > 2 and client_command[1] == "REQUEST":
                             for i in server_chatrooms:
                                 if client_command[2] == i.name:
+                                    found = True
                                     users = i.list_connected_users()
-                                    self.client_socket.send(users.encode())
+                                    output = "trgIRC LISTME OK\n"
+                                    output += "MESSAGE\n"
+                                    output += users
+                                    self.client_socket.send(output.encode())
+                        if not found:
+                            output = "trgIRC/0.1 LISTME ERROR\n"
+                            output += "ERROR NOTFOUND\n"
+                            self.client_socket.send(output.encode())
                     case "LEAVCR":
+                        found = False
                         if len(client_command) > 1:
                             for i in server_chatrooms:
                                 if client_command[1] == i.name:
+                                    found = True
                                     lock.acquire()
                                     left = i.leave_chatroom(self.name)
                                     if left:
                                         self.rooms.remove(client_command[1])
                                         left_msg = self.name + " has disconnected from: " + i.name
                                         i.history.append(left_msg)
-
+                                        output = "trgIRC/0.1 LEAVCR OK\n"
+                                        self.client_socket.send(output.encode())
                                     else:
-                                        self.client_socket.send("Unknown room name\n".encode())
+                                        output = "trgIRC/0.1 LEAVCR ERROR\n"
+                                        output += "ERROR LEAVE\n"
+                                        self.client_socket.send(output.encode())
                                     lock.release()
+                        if not found:
+                            output = "trgIRC/0.1 LEAVCR ERROR\n"
+                            output += "ERROR NOTFOUND\n"
+                            self.client_socket.send(output.encode())
                     case "MSGCHR":
-                        if len(client_command) > 1:
+                        found = False
+                        if len(client_command) > 2:
                             for i in server_chatrooms:
-                                if client_command[1] == i.name:
+                                if client_command[1] == "REQUEST" and client_command[2] == i.name:
+                                    found = True
                                     lock.acquire()
-                                    # Come back and have this add up all of the packet lines
-                                    # after a certain point into one string to send as a message
-                                    sent_message = [time.time(), self.name, packet_lines[1]]
+                                    user_message = "";
+                                    for i in range(1, len(packet_lines)):
+                                        user_message += packet_lines[i]
+                                    sent_message = [time.time(), self.name, user_message]
                                     i.history.append(sent_message) 
                                     lock.release()
+                        if not found:
+                            output = "trgIRC/0.1 MSGCHR ERROR\n"
+                            output += "ERROR NOTFOUND\n"
+                            self.client_socket.send(output.encode())
                     case "MSGCRS":
                         print("placeholder!")
                     case "DSCTCL":
-                        self.client_socket.send("Disconnecting...".encode())
                         lock.acquire()
                         for i in self.rooms:
                             for j in server_chatrooms:
                                 if j.name == i:
                                     left = j.leave_chatroom(self.name)
                                     if not left:
+                                        # COME BACK TO
                                         print("failed to leave chatroom")
                                         print(j.userlist)
                                     else:
@@ -112,6 +178,7 @@ class connections:
                                         j.history.append(left_msg)
                         lock.release()
                         self.rooms = []
+                        disconnecting = True
                         self.client_socket.close()
                     case other:
                         self.client_socket.send("Server doesn't recognize client command\n".encode())

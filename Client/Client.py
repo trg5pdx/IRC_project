@@ -38,29 +38,33 @@ def main():
             
             match user_command[0]:
                 case "/help":
-                    client_socket.send("HELP".encode())
+                    request = "trgIRC/0.1 HELP\n"
+                    client_socket.send(request.encode())
                 case "/listcr":
-                    client_socket.send("LISTCR YES".encode())
+                    request = "trgIRC/0.1 LISTCR YES\n"
+                    client_socket.send(request.encode())
                 case "/create":
                     if len(user_command) > 1:
-                        client_command = "CREATE " + user_command[1]
-                        client_socket.send(client_command.encode())
+                        request = "trgIRC/0.1 CREATE " + user_command[1] + "\n"
+                        client_socket.send(request.encode())
+                    else:
+                        print("incorrect number of arguments")
                 case "/joincr":
                     if len(user_command) > 1:
-                        client_command = "JOINCR " + user_command[1]
-                        client_socket.send(client_command.encode())
+                        request = "trgIRC/0.1 JOINCR " + user_command[1] + "\n"
+                        client_socket.send(request.encode())
                     else:
                         print("Incorrect number of arguments")
                 case "/leavecr":
                     if len(user_command) > 1:
-                        client_command = "LEAVCR " + user_command[1]
-                        client_socket.send(client_command.encode())
+                        request = "trgIRC/0.1 LEAVCR " + user_command[1] + "\n"
+                        client_socket.send(request.encode())
                     else:
                         print("Incorrect number of arguments")
                 case "/listusers":
                     if len(user_command) > 1:
-                        client_command = "LISTME REQUEST " + user_command[1] + "\n"
-                        client_socket.send(client_command.encode())
+                        request = "trgIRC/0.1 LISTME REQUEST " + user_command[1] + "\n"
+                        client_socket.send(request.encode())
                         server_resp = client_socket.recv(1024).decode()
                         user_list = server_resp.split(";")
                         formatted_user_list = ""
@@ -73,30 +77,37 @@ def main():
                                 formatted_user_list += current
                         print("Users currently connected to " + user_command[1])
                         print(formatted_user_list)
-
+                    else:
+                        print("Incorrect number of arguments")
                 case "/send":
                     if len(user_command) > 2:
-                        client_command = "MSGCHR " + user_command[1] + "\n"
+                        request = "trgIRC/0.1 MSGCHR REQUEST " + user_command[1] + "\n"
+                        request += "MESSAGE\n"
                         for i in range(2, len(user_command)):
                             word = user_command[i] + " "
-                            client_command += word
-                        client_socket.send(client_command.encode())
+                            request += word
+                        client_socket.send(request.encode())
                     else:
                         print("Incorrect number of arguments")
                 case "/default":
                     if len(user_command) > 1:
                         default_room = user_command[1]
                     # Getting the chatroom list and checking if the room the user provided is there
-                    client_socket.send("LISTCR NO".encode())
+                    client_socket.send("trgIRC/0.1 LISTCR NO\n".encode())
                     server_resp = client_socket.recv(1024).decode()
                     room_list = server_resp.split(";") 
+                    found = False
                     for i in room_list:
                         chatroom = i.split(":")
                         if chatroom[0] == user_command[1]:
+                            found = True
                             default_room = chatroom[0]                         
-                     
+                            print("Default chatroom has been set")
+                    if not found:
+                        print("Failed to set default room: Couldn't find the specified chatroom")
+
                 case "/quit":
-                    client_socket.send("DSCTCL".encode())
+                    client_socket.send("trgIRC/0.1 DSCTCL\n".encode())
                     print("Disconnecting...")
                     quitting = True
         # Redo this to make it more clear; currently checks if the default rooms been set

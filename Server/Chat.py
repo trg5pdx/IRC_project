@@ -30,11 +30,18 @@ class room:
                 user_list += current
         return user_list
 
+# Come back and have it throw instead of returning False
 def add_new_room(server_chatrooms, lock, name):
+    # Checking if a room with that name exists first
+    for i in server_chatrooms:
+        if name == i.name:
+            return False
+
     lock.acquire()
     new_chatroom = room(name)
     server_chatrooms.append(new_chatroom)
     lock.release()
+    return True
 
 def list_rooms(server_chatrooms, fancy):
     chat_list = ""

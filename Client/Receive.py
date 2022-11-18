@@ -5,7 +5,6 @@ def receive_server_responses(client_socket):
     while True:
         packet = client_socket.recv(1024).decode()
         packet_lines = packet.splitlines()
-        output = "" 
         
         """
         Thoughts on how to process packets:
@@ -14,10 +13,10 @@ def receive_server_responses(client_socket):
         the beginning of the message being sent over. Using the information provided in the headers,
         the client will then format the chat message how it wants and print it out to the user
         """
-        msg_recv = False
         msg_header = False
         connected = False
         conn_err = False
+        help_ok = False
         listcr_ok = False
         listcr_fancy = True # Expecting true as thats the option that requires no action
         listcr_err = False
@@ -33,6 +32,7 @@ def receive_server_responses(client_socket):
         time = 0
         room = ""
         message = "" 
+        output = "" 
         
         for i in packet_lines:
             if not msg_header: 
@@ -41,14 +41,14 @@ def receive_server_responses(client_socket):
                 match line[0]:
                     case "trgIRC/0.1":
                         match line[1]:
-                            case "MSGCHR":
-                                if line[2] == "RECV":
-                                    msg_recv = True
                             case "CONNCT":
                                 if line[2] == "OK":
                                     connected = True
                                 else:
                                     conn_err = True
+                            case "HELP":
+                                if line[2] == "OK":
+                                    help_ok = True
                             case "LISTCR":
                                 if line[2] == "OK":
                                     listcr_ok = True
@@ -75,10 +75,10 @@ def receive_server_responses(client_socket):
                                 else:
                                     leavcr_err = True
                             case "MSGCHR":
-                                if line[2] == "OK":
-                                    msgchr_ok = True
-                                else:
+                                if line[2] == "ERROR":
                                     msgchr_err = True
+                                else:
+                                    msgchr_ok = True
                     case "USERNAME":
                         username = line[1]
                     case "ROOM":
@@ -112,13 +112,14 @@ def receive_server_responses(client_socket):
                     case "MESSAGE":
                         msg_header = True
             else:
-                message += i
-        
-        if connected or listcr_fancy:
+                if help_ok:
+                    i = i + '\n'
+                    message += i
+                else:
+                    message += i
+        if connected or listcr_fancy or help_ok:
             output = message
-        if msg_recv:
-            if msgchr_ok:
-                output = "[" + room + "]" + username + ": " + message
-
+        if msgchr_ok:
+            output = "[" + room + "]" + username + ": " + message
         
         print(output)

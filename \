@@ -48,15 +48,15 @@ def accept_connections(server_socket, server_chatrooms):
 
 def print_help():
     return """
-/help: prints this menu\n
-/history: prints out the current message history\n
-/create <name>: creates a chatroom with the specified name\n
-/listcr: lists the currently open chatrooms\n
-/joincr <name>: join the chatroom with the specified name\n
-/listusers <chatroom name>: lists the users currently in a chatroom\n
-/send <chatroom name> <message>: send a message to a specific chatroom\n
-/leavecr <name>: leave the chatroom with the specified name\n
-/quit: closes the server\n"""
+/help: prints this menu
+/history: prints out the current message history
+/create <name>: creates a chatroom with the specified name
+/listcr: lists the currently open chatrooms
+/joincr <name>: join the chatroom with the specified name
+/listusers <chatroom name>: lists the users currently in a chatroom
+/send <chatroom name> <message>: send a message to a specific chatroom
+/leavecr <name>: leave the chatroom with the specified name
+/quit: closes the server"""
 
 def main():
     server_socket = socket(AF_INET, SOCK_STREAM)
@@ -96,7 +96,7 @@ def main():
                     name = given_command[1]
                     add_new_room(server_chatrooms, lock, name)
             case "/listcr":
-                chatlist = list_rooms(server_chatrooms, True)
+                chatlist = list_rooms(server_chatrooms)
                 print("List of currently open chatrooms:\n")
                 print(chatlist)
             case "/listusers":

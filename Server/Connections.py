@@ -45,6 +45,7 @@ class connections:
                 packet_lines = response.splitlines()
                 client_command = packet_lines[0].split()
                 
+                """
                 if client_command[0] == "trgIRC/0.1":
                     continue
                 else:
@@ -53,12 +54,12 @@ class connections:
                     error_message = "trgIRC/0.1 OTHER ERROR\n"
                     error_message += "ERROR FORMAT\n"
                     self.client_socket.send(error_message.encode())
-
+                """
                 match client_command[1]:
                     case "HELP":
-                        help_message = "trg5IRC HELP OK\n"
+                        help_message = "trgIRC/0.1 HELP OK\n"
                         help_message += "MESSAGE\n"
-                        help_message = print_help()
+                        help_message += print_help()
                         self.client_socket.send(help_message.encode())
                     case "LISTCR":
                         rooms = "" 
@@ -90,10 +91,10 @@ class connections:
                             self.client_socket.send(output.encode())
                     case "JOINCR":
                         joined = False
-                        if len(client_command) > 1:
+                        if len(client_command) > 2:
                             # Come back and improve the error handling here
                             for i in server_chatrooms:
-                                if i.name == client_command[1]:
+                                if i.name == client_command[2]:
                                     i.join_chatroom(self.name)
                                     self.rooms.append([i.name, 0])
                                     joined = True
@@ -108,9 +109,9 @@ class connections:
 
                     case "LISTME":
                         found = False
-                        if len(client_command) > 2 and client_command[1] == "REQUEST":
+                        if len(client_command) > 3 and client_command[2] == "REQUEST":
                             for i in server_chatrooms:
-                                if client_command[2] == i.name:
+                                if client_command[3] == i.name:
                                     found = True
                                     users = i.list_connected_users()
                                     output = "trgIRC LISTME OK\n"
@@ -123,14 +124,14 @@ class connections:
                             self.client_socket.send(output.encode())
                     case "LEAVCR":
                         found = False
-                        if len(client_command) > 1:
+                        if len(client_command) > 2:
                             for i in server_chatrooms:
-                                if client_command[1] == i.name:
+                                if client_command[2] == i.name:
                                     found = True
                                     lock.acquire()
                                     left = i.leave_chatroom(self.name)
                                     if left:
-                                        self.rooms.remove(client_command[1])
+                                        self.rooms.remove(client_command[2])
                                         left_msg = self.name + " has disconnected from: " + i.name
                                         i.history.append(left_msg)
                                         output = "trgIRC/0.1 LEAVCR OK\n"
@@ -146,14 +147,14 @@ class connections:
                             self.client_socket.send(output.encode())
                     case "MSGCHR":
                         found = False
-                        if len(client_command) > 2:
+                        if len(client_command) > 3:
                             for i in server_chatrooms:
-                                if client_command[1] == "REQUEST" and client_command[2] == i.name:
+                                if client_command[2] == "REQUEST" and client_command[3] == i.name:
                                     found = True
                                     lock.acquire()
                                     user_message = "";
-                                    for i in range(1, len(packet_lines)):
-                                        user_message += packet_lines[i]
+                                    for j in range(2, len(packet_lines)):
+                                        user_message += packet_lines[j]
                                     sent_message = [time.time(), self.name, user_message]
                                     i.history.append(sent_message) 
                                     lock.release()

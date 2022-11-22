@@ -51,10 +51,8 @@ def main():
             case "/joincr":
                 if len(user_command) > 1:
                     room_names = user_command[1].split()
-                    print(room_names) 
                     for i in room_names:
                         request = "trgIRC/0.1 JOINCR " + i + "\n"
-                        print("request being sent out:\n" + request)
                         client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")
@@ -85,14 +83,11 @@ def main():
             case "/send":
                 if len(user_command) > 1:
                     message_queue = user_command[1].split(';')
-                    print(message_queue)
                     for i in message_queue:
                         room_message = i.split(' ', 1)
-                        print(room_message)
                         request = "trgIRC/0.1 MSGCHR REQUEST " + room_message[0] + "\n"
                         request += "MESSAGE\n"
                         request += room_message[1]
-                        print(request)
                         client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")

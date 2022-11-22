@@ -125,6 +125,5 @@ def receive_server_responses(client_socket):
             output = print_chatroom_list(message)
         if msgchr_ok:
             output = "[" + room + "]" + username + ": " + message
-            print("output: " + output)
         
         print(output)

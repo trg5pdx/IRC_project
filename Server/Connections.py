@@ -25,11 +25,7 @@ class connections:
                             self.client_socket.send(user_message.encode())
                             i += 1
                         user_room[1] = i
-    
-    """
-    NOTE: currently editing to handle packet format, running it right now will probably fail until every part of this
-    has been fully updated to account for the new packet format
-    """
+
     def receive_message(self, server_chatrooms, lock):
         response = ""
         disconnecting = False
@@ -62,19 +58,9 @@ class connections:
                         help_message += print_help()
                         self.client_socket.send(help_message.encode())
                     case "LISTCR":
-                        rooms = "" 
-                        fancy = False
                         # Look at having list_rooms throw an exception when there aren't any rooms
-                        if len(client_command) > 3 and client_command[2] == "YES":
-                            rooms += list_rooms(server_chatrooms, True) 
-                            fancy = True
-                        else:
-                            rooms += list_rooms(server_chatrooms, False)
+                        rooms = list_rooms(server_chatrooms)
                         output = "trgIRC/0.1 LISTCR OK\n"
-                        if fancy:
-                            output += "FANCY TRUE\n"
-                        else:
-                            output += "FANCY FALSE\n"
                         output += "MESSAGE\n"
                         output += rooms
                         self.client_socket.send(output.encode())

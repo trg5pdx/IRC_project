@@ -1,24 +1,29 @@
 from socket import *
 import time
 
+def print_chatroom_list(rooms):
+    room_list = rooms.split(";")
+
+    output = "List of open chatrooms:\n"
+    for i in room_list:
+        if len(i) > 0:
+            room = i.split(":")
+            if room[1] == 1:
+                output += room[0] + ": " + room[1] + " user connected\n"
+            else:
+                output += room[0] + ": " + room[1] + " users connected\n"
+    return output 
+
 def receive_server_responses(client_socket):
     while True:
         packet = client_socket.recv(1024).decode()
         packet_lines = packet.splitlines()
         
-        """
-        Thoughts on how to process packets:
-        have flags set up at the beginning of the function that would get flipped as it parses
-        each line, with it exiting the loop once it hits the message line, indicating
-        the beginning of the message being sent over. Using the information provided in the headers,
-        the client will then format the chat message how it wants and print it out to the user
-        """
         msg_header = False
         connected = False
         conn_err = False
         help_ok = False
         listcr_ok = False
-        listcr_fancy = True # Expecting true as thats the option that requires no action
         listcr_err = False
         create_err = False
         joincr_err = False
@@ -29,7 +34,7 @@ def receive_server_responses(client_socket):
         msgchr_ok = False
         msgchr_err = False
         username = ""
-        time = 0
+        msg_time = 0
         room = ""
         message = "" 
         output = "" 
@@ -83,11 +88,8 @@ def receive_server_responses(client_socket):
                         username = line[1]
                     case "ROOM":
                         room = line[1]
-                    case "FANCY":
-                        # Only checking for false as otherwise it will be printed like any other msg
-                        if line[1] == "FALSE":
-                            print("placeholder! add a function for format this neatly later")
-                            listcr_fancy = False
+                    case "TIME":
+                        msg_time = line[1]
                     case "ERROR":
                         if conn_err:
                             # Come back later to have the user reenter a username
@@ -117,9 +119,12 @@ def receive_server_responses(client_socket):
                     message += i
                 else:
                     message += i
-        if connected or listcr_fancy or help_ok:
+        if connected or help_ok:
             output = message
+        if listcr_ok:
+            output = print_chatroom_list(message)
         if msgchr_ok:
             output = "[" + room + "]" + username + ": " + message
+            print("output: " + output)
         
         print(output)

@@ -14,7 +14,6 @@ from Chat import *
 # Also using this to help with communicating the message between threads
 # https://stackoverflow.com/questions/51242467/communicate-data-between-threads-in-python
 
-queue = []
 lock = threading.Condition()
 
 def accept_connections(server_socket, server_chatrooms):
@@ -30,7 +29,7 @@ def accept_connections(server_socket, server_chatrooms):
                 name = username_line[1]
                 name_ack = "trgIRC/0.1 CONNCT OK\n"
                 name_ack += "MESSAGE\n"
-                name_ack += "\nWelcome " + name + " to the IRC server!\n\n"
+                name_ack += "Welcome " + name + " to the IRC server!\n\n"
                 connection_socket.send(name_ack.encode()) 
             else:
                 message = "trgIRC/0.1 CONNCT ERROR\n"
@@ -75,7 +74,7 @@ def main():
 
     server_chatrooms = []
 
-    print("Ready to accept connections\n")
+    print("Ready to accept connections")
     # Spinning up another thread to allow for it to accept connections and have the
     # server be able to run commands on it's own
     threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms,), daemon=True).start()

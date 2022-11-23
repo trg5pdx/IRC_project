@@ -32,17 +32,17 @@ class connections:
 
         # Flags for processing incoming packets, primarily for telling function
         # how to interpret header lines and the message attached
-        msgchr = False
-        msg_header = False
-        selected_room = ""
-        user_message = ""
         
         while not disconnecting: 
             response = self.client_socket.recv(1024).decode()
             individual_packets = response.split("trgIRC/0.1")
-             
+
             for i in individual_packets:
                 if len(i) > 0:
+                    msgchr = False
+                    msg_header = False
+                    selected_room = ""
+                    user_message = ""
                     packet_lines = i.splitlines()
                     for j in packet_lines:
                         if not msg_header:
@@ -74,8 +74,6 @@ class connections:
                                     if len(client_command) > 2:
                                         msgchr = True
                                         selected_room = client_command[2]
-                                case "MSGCRS":
-                                    print("placeholder!")
                                 case "DSCTCL":
                                     self.__disconnecting(server_chatrooms, lock)
                                     disconnecting = True
@@ -83,14 +81,14 @@ class connections:
                                     msg_header = True
                                 case other:
                                     self.__send_misc_error()
-                    else:
-                        if msg_header and msgchr:
-                            user_message += j
+                        else:
+                            if msg_header and msgchr:
+                                user_message += j
                 
-            if msg_header and msgchr:
-                self.__send_message_to_chatroom(
-                        server_chatrooms, lock, 
-                        selected_room, user_message) 
+                    if msg_header and msgchr:
+                        self.__send_message_to_chatroom(
+                                server_chatrooms, lock, 
+                                selected_room, user_message) 
                  
 
     def __send_misc_error(self):
@@ -121,7 +119,7 @@ class connections:
             if room_name == i.name:
                 lock.acquire()
                 i.join_chatroom(self.name)
-                self.rooms.append([i.name, time.time()])
+                self.rooms.append([i.name, 0])
                 joined = True
                 lock.release()
                 output = "trgIRC/0.1 JOINCR OK\n"

@@ -89,13 +89,24 @@ def main():
             case "/help":
                 print(print_help())
             case "/history":
-                print(queue)
+                if len(given_command) > 1:
+                    output = ""
+                    found = False
+                    for i in server_chatrooms:
+                        if i.name == given_command[1]:
+                            found = True
+                            output += "Room history for: " + i.name + "\n"
+                            for j in i.history:
+                                output += j[1] + ": " + j[2]
+                    if not found:
+                        output = "The specified room was not found"
+                    print(output)
             case "/create":
                 if len(given_command) > 1:
                     name = given_command[1]
                     add_new_room(server_chatrooms, lock, name)
             case "/listcr":
-                chatlist = list_rooms(server_chatrooms, True)
+                chatlist = list_rooms(server_chatrooms)
                 print("List of currently open chatrooms:\n")
                 print(chatlist)
             case "/listusers":

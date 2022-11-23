@@ -62,22 +62,10 @@ def main():
                     client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")
-            case "/listusers": # PLEASE FIX; HAVE IT BE PROCESSED IN RECEIVE.PY
+            case "/listusers": 
                 if len(user_command) > 1:
                     request = "trgIRC/0.1 LISTME REQUEST " + user_command[1] + "\n"
                     client_socket.send(request.encode())
-                    server_resp = client_socket.recv(1024).decode()
-                    user_list = server_resp.split(";")
-                    formatted_user_list = ""
-
-                    for i in user_list:
-                        if i == user_list[-1]:
-                            formatted_user_list += i
-                        else:
-                            current = i + ", "
-                            formatted_user_list += current
-                    print("Users currently connected to " + user_command[1])
-                    print(formatted_user_list)
                 else:
                     print("Incorrect number of arguments")
             case "/send":

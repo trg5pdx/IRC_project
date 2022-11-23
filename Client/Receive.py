@@ -14,6 +14,18 @@ def print_chatroom_list(rooms):
                 output += room[0] + ": " + room[1] + " users connected\n"
     return output 
 
+def print_user_list(users):
+    user_list = users.split(';')
+    output = ""
+
+    for i in user_list:
+        if i == user_list[-1]:
+            output += i
+        else:
+            output += i + ", "
+
+    return output
+
 def receive_server_responses(client_socket):
     while True:
         packet = client_socket.recv(1024).decode()
@@ -42,7 +54,7 @@ def receive_server_responses(client_socket):
         for i in packet_lines:
             if not msg_header: 
                 line = i.split()
-                
+
                 match line[0]:
                     case "trgIRC/0.1":
                         match line[1]:
@@ -123,6 +135,8 @@ def receive_server_responses(client_socket):
             output = message
         if listcr_ok:
             output = print_chatroom_list(message)
+        if listme_ok:
+            output = print_user_list(message)    
         if msgchr_ok:
             output = "[" + room + "]" + username + ": " + message
         

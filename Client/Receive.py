@@ -26,6 +26,36 @@ def print_user_list(users):
 
     return output
 
+def set_username(client_socket):
+    successfully_set = False
+
+    while not successfully_set:
+        name = input("Enter your name:\n")
+        connection_message = "trgIRC/0.1 CONNCT CLIENT\n"
+        connection_message += "USERNAME " + name + "\n"
+        
+        # try:
+        client_socket.send(connection_message.encode())
+        
+        server_response = client_socket.recv(1024).decode()
+        packet_lines = server_response.splitlines() 
+        if packet_lines[0] == "trgIRC/0.1 CONNCT OK" and packet_lines[1] == "MESSAGE":
+                print(packet_lines[2])
+                successfully_set = True
+        elif packet_lines[0] == "trgIRC/0.1 CONNCT ERROR":
+            match packet_lines[1]:
+                case "ERROR NAMEDUP":
+                    print("Error, someone on the server is already using that name.")
+                case other:
+                    print("Error, problem relating to formatting")
+        """
+        except:
+            print("Server has disconnected, closing client...")
+            return False
+        """
+
+    return successfully_set
+
 def receive_server_responses(client_socket):
     while True:
         packet = client_socket.recv(1024).decode()
@@ -34,8 +64,6 @@ def receive_server_responses(client_socket):
             packet_lines = i.splitlines()
             
             msg_header = False
-            connected = False
-            conn_err = False
             help_ok = False
             listcr_ok = False
             listcr_err = False
@@ -53,15 +81,11 @@ def receive_server_responses(client_socket):
             message = "" 
             output = "" 
             
+            # Not checking CONNCT as that's handled by the accept_connections function
             for i in packet_lines:
                 if not msg_header: 
                     line = i.split()
                     match line[0]:
-                        case "CONNCT":
-                            if line[1] == "OK":
-                                connected = True
-                            else:
-                                conn_err = True
                         case "HELP":
                             if line[1] == "OK":
                                 help_ok = True
@@ -102,9 +126,6 @@ def receive_server_responses(client_socket):
                         case "TIME":
                             msg_time = line[1]
                         case "ERROR":
-                            if conn_err:
-                                # Come back later to have the user reenter a username
-                                print("Error failed to connect")
                             if create_err:
                                 if line[1] == "ROOMEXISTS":
                                     print("Failed, room already exists")
@@ -130,7 +151,7 @@ def receive_server_responses(client_socket):
                         message += i
                     else:
                         message += i
-            if connected or help_ok:
+            if help_ok:
                 output = message
             if listcr_ok:
                 output = print_chatroom_list(message)

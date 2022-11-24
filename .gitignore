@@ -1,2 +1,4 @@
 __pycache__/
 *.Vim
+*.py.swp
+/.vs/

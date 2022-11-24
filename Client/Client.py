@@ -17,14 +17,20 @@ def main():
         print("server host and port set at commandline")
 
     client_socket.connect((server_name, server_port))
-    
-    threading.Thread(target=receive_server_responses, args=(client_socket,), daemon=True).start()
-    
+    """    
     name = input("Enter your name:\n")
     connection_message = "trgIRC/0.1 CONNCT CLIENT\n"
     connection_message += "USERNAME " + name + "\n"
-
     client_socket.send(connection_message.encode())
+    """
+
+    name_set = set_username(client_socket)
+    
+    if not name_set:
+        client_socket.close()
+        sys.exit()
+    
+    threading.Thread(target=receive_server_responses, args=(client_socket,), daemon=True).start()
 
     message = "" 
     default_room = ""

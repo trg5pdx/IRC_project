@@ -16,31 +16,44 @@ from Chat import *
 
 lock = threading.Condition()
 
-def accept_connections(server_socket, server_chatrooms):
+def accept_connections(server_socket, server_chatrooms, user_list):
     while True:
         connection_socket, addr = server_socket.accept()
-        initial_client_command = connection_socket.recv(1024).decode()
-        command = initial_client_command.splitlines()
         name = ""
-        # Come back and add error handling for when a client would send the wrong command
-        if command[0] == "trgIRC/0.1 CONNCT CLIENT":
-            username_line = command[1].split()
-            if username_line[0] == "USERNAME":
-                name = username_line[1]
-                name_ack = "trgIRC/0.1 CONNCT OK\n"
-                name_ack += "MESSAGE\n"
-                name_ack += "Welcome " + name + " to the IRC server!\n\n"
-                connection_socket.send(name_ack.encode()) 
+        accepted_username = False
+        while not accepted_username:
+            initial_client_command = connection_socket.recv(1024).decode()
+            command = initial_client_command.splitlines()
+            if command[0] == "trgIRC/0.1 CONNCT CLIENT":
+                username_line = command[1].split()
+                if username_line[0] == "USERNAME":
+                    name = username_line[1]
+                    found_duplicate = False 
+                    for user in user_list:
+                        if user == name:
+                            found_duplicate = True
+                    if found_duplicate: 
+                        name_dup = "trgIRC/0.1 CONNCT ERROR\n"
+                        name_dup += "ERROR NAMEDUP\n"
+                        connection_socket.send(name_dup.encode())
+                    else:
+                        accepted_username = True
+                        lock.acquire()
+                        user_list.append(name)
+                        lock.release()
+                        name_ack = "trgIRC/0.1 CONNCT OK\n"
+                        name_ack += "MESSAGE\n"
+                        name_ack += "Welcome " + name + " to the IRC server!\n\n"
+                        connection_socket.send(name_ack.encode()) 
+                else:
+                    message = "trgIRC/0.1 CONNCT ERROR\n"
+                    message += "ERROR HEADER\n"
+                    connection_socket.send(message.encode())
+
             else:
                 message = "trgIRC/0.1 CONNCT ERROR\n"
-                message += "ERROR HEADER\n"
+                message += "ERROR STATUS\n"
                 connection_socket.send(message.encode())
-
-        else:
-            message = "trgIRC/0.1 CONNCT ERROR\n"
-            message += "ERROR STATUS\n"
-            connection_socket.send(message.encode())
-
         client = connections(name, connection_socket)
         threading.Thread(target=client.send_messages, args=(server_chatrooms,), daemon=True).start() 
         threading.Thread(target=client.receive_message, args=(server_chatrooms, lock,), daemon=True).start()
@@ -73,11 +86,13 @@ def main():
     server_socket.listen(1)
 
     server_chatrooms = []
+    user_list = []
+    
 
     print("Ready to accept connections")
     # Spinning up another thread to allow for it to accept connections and have the
     # server be able to run commands on it's own
-    threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms,), daemon=True).start()
+    threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms, user_list), daemon=True).start()
     
     server_command = ""
 
@@ -112,8 +127,8 @@ def main():
             case "/listusers":
                 if len(given_command) > 1:
                     current_room = given_command[1]
-                    user_list = list_connected_users(server_chatrooms, current_room)
-                    print(user_list)
+                    users_in_room = list_connected_users(server_chatrooms, current_room)
+                    print(users_in_room)
             case "/quit":
                 print("closing server...")
             case other:

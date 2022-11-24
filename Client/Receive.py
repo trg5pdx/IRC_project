@@ -27,36 +27,29 @@ def print_user_list(users):
     return output
 
 def set_username(client_socket):
-    successfully_set = False
-
-    while not successfully_set:
+    while True:
         name = input("Enter your name:\n")
         connection_message = "trgIRC/0.1 CONNCT CLIENT\n"
         connection_message += "USERNAME " + name + "\n"
         
-        # try:
-        client_socket.send(connection_message.encode())
-        
-        server_response = client_socket.recv(1024).decode()
-        packet_lines = server_response.splitlines() 
-        if packet_lines[0] == "trgIRC/0.1 CONNCT OK" and packet_lines[1] == "MESSAGE":
-                print(packet_lines[2])
-                successfully_set = True
-        elif packet_lines[0] == "trgIRC/0.1 CONNCT ERROR":
-            match packet_lines[1]:
-                case "ERROR NAMEDUP":
-                    print("Error, someone on the server is already using that name.")
-                case other:
-                    print("Error, problem relating to formatting")
-        """
+        try:
+            client_socket.send(connection_message.encode())
+            server_response = client_socket.recv(1024).decode()
+            packet_lines = server_response.splitlines() 
+            if packet_lines[0] == "trgIRC/0.1 CONNCT OK" and packet_lines[1] == "MESSAGE":
+                    print(packet_lines[2])
+                    return True
+            elif packet_lines[0] == "trgIRC/0.1 CONNCT ERROR":
+                match packet_lines[1]:
+                    case "ERROR NAMEDUP":
+                        print("Error, someone on the server is already using that name.")
+                    case other:
+                        print("Error, problem relating to formatting")
         except:
             print("Server has disconnected, closing client...")
             return False
-        """
 
-    return successfully_set
-
-def receive_server_responses(client_socket):
+def receive_server_responses(client_socket, active_connection):
     while True:
         packet = client_socket.recv(1024).decode()
         individual_packets = packet.split("trgIRC/0.1")
@@ -131,7 +124,7 @@ def receive_server_responses(client_socket):
                                     print("Failed, room already exists")
                             if joincr_err:
                                 if line[1] == "NOTFOUND":
-                                    print("Failed to join, couldn't find room with that name")
+                                    print("Failed to join, no room with that name")
                             if listme_err:
                                 if line[1] == "NOTFOUND":
                                     print("Failed to find that room")
@@ -145,6 +138,12 @@ def receive_server_responses(client_socket):
                                     print("Couldn't find that room")
                         case "MESSAGE":
                             msg_header = True
+                        case "DSCTSV":
+                            lock.acquire()
+                            active_connection = False
+                            lock.release()
+                            print("Server has disconnected from the client, now shutting down...")
+                            thread.exit()
                 else:
                     if help_ok:
                         i = i + '\n'

@@ -9,8 +9,8 @@ class connections:
         self.rooms = []
         self.client_socket = client_socket
 
-    def send_messages(self, server_chatrooms):
-        while True:
+    def send_messages(self, server_chatrooms, active):
+        while active:
             for rooms in server_chatrooms:
                 for user_room in self.rooms:
                     if user_room[0] == rooms.name and len(rooms.history) > user_room[1]:
@@ -26,7 +26,12 @@ class connections:
                             i += 1
                         user_room[1] = i
 
-    def receive_message(self, server_chatrooms, lock):
+        if not active:
+            closing_message = "trgIRC/0.1 DSCTSV\n"
+            self.client_socket.send(closing_message.encode())
+            thread.exit()
+
+    def receive_message(self, server_chatrooms, lock, user_list):
         response = ""
         disconnecting = False
 
@@ -56,7 +61,7 @@ class connections:
                                 case "LISTCR":
                                     # Look at having list_rooms throw an exception when 
                                     # there aren't any rooms
-                                    self.__list_chatrooms(self, server_chatrooms)
+                                    self.__list_chatrooms(server_chatrooms)
                                 case "CREATE":
                                     if len(client_command) > 1:
                                         self.__create_chatroom(server_chatrooms, client_command[1])
@@ -75,7 +80,7 @@ class connections:
                                         msgchr = True
                                         selected_room = client_command[2]
                                 case "DSCTCL":
-                                    self.__disconnecting(server_chatrooms, lock)
+                                    self.__disconnecting(server_chatrooms, lock, user_list)
                                     disconnecting = True
                                 case "MESSAGE":
                                     msg_header = True
@@ -157,7 +162,7 @@ class connections:
                 lock.acquire()
                 left = i.leave_chatroom(self.name)
                 if left:
-                    self.rooms.remove(client_command[2])
+                    self.rooms.remove(room_name)
                     left_msg = self.name + " has disconnected from: " + i.name
                     i.history.append(left_msg)
                     output = "trgIRC/0.1 LEAVCR OK\n"
@@ -188,7 +193,7 @@ class connections:
             self.client_socket.send(output.encode())
         
 
-    def __disconnecting(self, server_chatrooms, lock):    
+    def __disconnecting(self, server_chatrooms, lock, user_list):    
         lock.acquire()
         for i in self.rooms:
             for j in server_chatrooms:
@@ -201,6 +206,7 @@ class connections:
                     else:
                         left_msg = self.name + " has disconnected from: " + j.name
                         j.history.append(left_msg)
+        user_list.remove(self.name)
         lock.release()
         self.rooms = []
         print(self.name + " has disconnected from the server")

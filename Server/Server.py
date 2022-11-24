@@ -16,7 +16,7 @@ from Chat import *
 
 lock = threading.Condition()
 
-def accept_connections(server_socket, server_chatrooms, user_list):
+def accept_connections(server_socket, server_chatrooms, user_list, active):
     while True:
         connection_socket, addr = server_socket.accept()
         name = ""
@@ -55,8 +55,8 @@ def accept_connections(server_socket, server_chatrooms, user_list):
                 message += "ERROR STATUS\n"
                 connection_socket.send(message.encode())
         client = connections(name, connection_socket)
-        threading.Thread(target=client.send_messages, args=(server_chatrooms,), daemon=True).start() 
-        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock,), daemon=True).start()
+        threading.Thread(target=client.send_messages, args=(server_chatrooms, active,), daemon=True).start() 
+        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock, user_list,), daemon=True).start()
 
 def print_help():
     return """
@@ -87,16 +87,17 @@ def main():
 
     server_chatrooms = []
     user_list = []
+    active = True
     
 
     print("Ready to accept connections")
     # Spinning up another thread to allow for it to accept connections and have the
     # server be able to run commands on it's own
-    threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms, user_list), daemon=True).start()
+    threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms, user_list, active,), daemon=True).start()
     
     server_command = ""
 
-    while server_command != "/quit":
+    while active:
         server_command = input()
         given_command = server_command.split()
 
@@ -129,8 +130,19 @@ def main():
                     current_room = given_command[1]
                     users_in_room = list_connected_users(server_chatrooms, current_room)
                     print(users_in_room)
+                else:
+                    output = ""
+                    for i in user_list:
+                        if i == user_list[-1]:
+                            output += i
+                        else:
+                            output += i + ", "
+                    print(output)
             case "/quit":
                 print("closing server...")
+                lock.acquire()
+                active = False
+                lock.release()
             case other:
                 print("Unknown command")
 

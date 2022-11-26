@@ -26,7 +26,7 @@ def main():
         client_socket.close()
         sys.exit()
     
-    threading.Thread(target=receive_server_responses, args=(client_socket, active_connection,), daemon=True).start()
+    threading.Thread(target=receive_server_responses, args=(client_socket, active_connection, lock,), daemon=True).start()
 
     message = "" 
     default_room = ""

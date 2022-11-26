@@ -128,6 +128,7 @@ class connections:
                 joined = True
                 lock.release()
                 output = "trgIRC/0.1 JOINCR OK\n"
+                output += "ROOM " + i.name + "\n"
                 self.client_socket.send(output.encode())
         if not joined:
             output = "trgIRC/0.1 JOINCR ERROR\n"
@@ -143,6 +144,7 @@ class connections:
                 users = i.list_connected_users()
                 print("USERS: " + users + "\n")
                 output = "trgIRC/0.1 LISTME OK\n"
+                output += "ROOM " + i.name + "\n"
                 # Maybe send back the room name for the client?
                 output += "MESSAGE\n"
                 output += users
@@ -179,19 +181,28 @@ class connections:
 
     def __send_message_to_chatroom(self, server_chatrooms, lock, room_name, user_message):
         found = False
+        joined = False
 
         for i in server_chatrooms:
             if room_name == i.name:
-                found = True
-                lock.acquire()
-                sent_message = [time.time(), self.name, user_message]
-                i.history.append(sent_message)
-                lock.release
+                # checking if the user is connected to the specified room
+                for user in i.userlist:
+                    if self.name == user[1]:
+                        joined = True
+                        found = True
+                        lock.acquire()
+                        sent_message = [time.time(), self.name, user_message]
+                        i.history.append(sent_message)
+                        lock.release
+                if not joined:
+                    found = True
+                    output = "trgIRC/0.1 MSGCHR ERROR\n"
+                    output += "ERROR NOTJOINED\n"
+                    self.client_socket.send(output.encode())
         if not found:
             output = "trgIRC/0.1 MSGCHR ERROR\n"
             output += "ERROR NOTFOUND\n"
             self.client_socket.send(output.encode())
-        
 
     def __disconnecting(self, server_chatrooms, lock, user_list):    
         lock.acquire()

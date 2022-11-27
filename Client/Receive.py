@@ -1,6 +1,11 @@
 from socket import *
+from enum import Enum
+from threading import Thread, Lock
 import time
-import threading
+
+Error = Enum('Error', ['Null', 'NotFound', 'NotJoined', 'RoomExists', 'Leave', 'Format', 'Other'])
+Cmd = Enum('Cmd', ['Null','ListCR','Create','JoinCR','ListME','LeavCR','Msgchr',])
+CmdStatus = Enum('CmdStatus', ['Ok','Error'])
 
 def print_chatroom_list(rooms):
     room_list = rooms.split(";")
@@ -52,78 +57,91 @@ def set_username(client_socket):
             print("Server has disconnected, closing client...")
             return False
 
-def receive_server_responses(client_socket, active_connection, lock):
+
+def handle_errors(packet_cmd, packet_status, error_str):
+    match packet_status:
+        case CmdStatus.Ok:
+            print("Something went wrong here")
+        case CmdStatus.Error:
+            match packet_cmd:
+                case Cmd.Create:
+                    if error_str == "ROOMEXISTS":
+                        return Error.RoomExists
+                    else:
+                        return Error.Null
+                case Cmd.JoinCR | Cmd.ListME:
+                    if error_str == "NOTFOUND":
+                        return Error.NotFound
+                    else:
+                        return Error.Null
+                case Cmd.LeavCR:
+                    if error_str == "NOTFOUND":
+                        return Error.NotFound
+                    elif error_str == "LEAVE":
+                        return Error.Leave
+                    else:
+                        return Error.Null
+                case Cmd.Msgchr:
+                    if error_str == "NOTFOUND":
+                        return Error.NotFound
+                    elif error_str == "NOTJOINED":
+                        return Error.NotJoined
+                    else:
+                        return Error.Null
+
+def set_status(status_code):
+    match status_code:
+        case "OK" | "RECV":
+            return CmdStatus.Ok
+        case "ERROR":
+            return CmdStatus.Error
+        case other:
+            return CmdStatus.Error
+
+def receive_server_responses(client_socket, lock):
     while True:
         try:
             packet = client_socket.recv(1024).decode()
             if not packet:
                 print("Server has disconnected, closing client...")
-                lock.acquire()
-                active_connection = False
-                lock.release()
-                break
-
-            individual_packets = packet.split("trgIRC/0.1")
+                return
+            individual_packets = list(filter(None, packet.split("trgIRC/0.1")))
             for i in individual_packets:
                 packet_lines = i.splitlines()
                 
+                packet_cmd = Cmd.Null
+                packet_status = CmdStatus.Ok
                 msg_header = False
-                help_ok = False
-                listcr_ok = False
-                listcr_err = False
-                create_err = False
-                joincr_ok = False 
-                joincr_err = False
-                listme_ok = False
-                listme_err = False
-                leavcr_ok = False
-                leavcr_err = False
-                msgchr_ok = False
-                msgchr_err = False
+                errors = Error.Null
                 username = ""
                 msg_time = 0
                 room = ""
                 message = "" 
                 output = "" 
-                
+
                 # Not checking CONNCT as that's handled by the accept_connections function
                 for i in packet_lines:
                     if not msg_header: 
-                        line = i.split()
+                        line = list(filter(None, i.split()))
                         match line[0]:
-                            case "HELP":
-                                if line[1] == "OK":
-                                    help_ok = True
                             case "LISTCR":
-                                if line[1] == "OK":
-                                    listcr_ok = True
-                                else:
-                                    print("No chatrooms are open")
+                                packet_cmd = Cmd.ListCR
+                                packet_status = set_status(line[1])
                             case "CREATE":
-                                if line[1] == "OK":
-                                    print("Room created successfully")
-                                else:
-                                    create_err = True
+                                packet_cmd = Cmd.Create
+                                packet_status = set_status(line[1])
                             case "JOINCR":
-                                if line[1] == "OK":
-                                    joincr_ok = True
-                                else:
-                                    joincr_err = True
+                                packet_cmd = Cmd.JoinCR
+                                packet_status = set_status(line[1])
                             case "LISTME":
-                                if line[1] == "OK":
-                                    listme_ok = True
-                                else:
-                                    listme_err = True
+                                packet_cmd = Cmd.ListME
+                                packet_status = set_status(line[1])
                             case "LEAVCR":
-                                if line[1] == "OK":
-                                    leavcr_ok = True
-                                else:
-                                    leavcr_err = True
+                                packet_cmd = Cmd.LeavCR
+                                packet_status = set_status(line[1])
                             case "MSGCHR":
-                                if line[1] == "ERROR":
-                                    msgchr_err = True
-                                else:
-                                    msgchr_ok = True
+                                packet_cmd = Cmd.Msgchr
+                                packet_status = set_status(line[1])
                             case "USERNAME":
                                 username = line[1]
                             case "ROOM":
@@ -131,54 +149,51 @@ def receive_server_responses(client_socket, active_connection, lock):
                             case "TIME":
                                 msg_time = line[1]
                             case "ERROR":
-                                if create_err:
-                                    if line[1] == "ROOMEXISTS":
-                                        print("Failed, room already exists")
-                                if joincr_err:
-                                    if line[1] == "NOTFOUND":
-                                        print("Failed to join, no room with that name")
-                                if listme_err:
-                                    if line[1] == "NOTFOUND":
-                                        print("Failed to find that room")
-                                if leavcr_err:
-                                    if line[1] == "NOTFOUND":
-                                        print("Couldn't find that room")
-                                    if line[1] == "LEAVE":
-                                        print("Failed to leave that room")
-                                if msgchr_err:
-                                    if line[1] == "NOTFOUND":
-                                        print("Couldn't find that room")
-                                    if line[1] == "NOTJOINED":
-                                        print("Couldn't send message, not connected to chatroom")
+                                errors = handle_errors(packet_cmd, packet_status, line[1])
                             case "MESSAGE":
                                 msg_header = True
                             case "DSCTSV":
                                 lock.acquire()
                                 active_connection = False
                                 lock.release()
-                                print("Server has disconnected from the client, now shutting down...")
+                                print("Server has disconnected from the client, shutting down...")
                                 thread.exit()
                     else:
-                        if help_ok:
-                            i = i + '\n'
-                            message += i
-                        else:
-                            message += i
-                if help_ok:
-                    output = message
-                if joincr_ok:
-                    output = "Succesfully joined " + room
-                if listcr_ok:
-                    output = print_chatroom_list(message)
-                if listme_ok:
-                    output = print_user_list(message, room)    
-                if msgchr_ok:
-                    output = "[" + room + "]" + username + ": " + message
-                
+                        message += i
+                match packet_status:
+                    case CmdStatus.Ok:
+                        match packet_cmd:
+                            case Cmd.JoinCR:
+                                output = "Successfully joined " + room
+                            case Cmd.LeavCR:
+                                output = "Successfully left " + room
+                            case Cmd.ListCR:
+                                output = print_chatroom_list(message)
+                            case Cmd.ListME:
+                                output = print_user_list(message, room)    
+                            case Cmd.Msgchr:
+                                output = "[" + room + "]" + username + ": " + message
+                            case Cmd.Create:
+                                output = "Successfully created " + room
+                    case CmdStatus.Error:
+                        match errors:
+                            case Error.NotFound:
+                                output = "Couldn't find " + room
+                            case Error.NotJoined:
+                                output = "Couldn't send message, not connected to " + room
+                            case Error.RoomExists:
+                                output = room + " already exists"
+                            case Error.Leave:
+                                output = "Failed to leave " + room
+                            case Error.Format:
+                                output = "Error with packet format"
+                            case Error.Other:
+                                output = "Some error has occured"
                 print(output)
-        except:
-            print("Server has disconnected, closing client...")
+        except Exception as e:
+            print("An error has occured, closing client, details:")
+            print(e)
             lock.acquire()
             active_connection = False
             lock.release()
-            thread.close()
+            return

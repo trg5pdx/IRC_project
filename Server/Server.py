@@ -56,19 +56,19 @@ def accept_connections(server_socket, server_chatrooms, user_list, active):
                 connection_socket.send(message.encode())
         client = connections(name, connection_socket)
         threading.Thread(target=client.send_messages, args=(server_chatrooms, active,), daemon=True).start() 
-        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock, user_list,), daemon=True).start()
+        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock, user_list, active,), daemon=True).start()
 
 def print_help():
     return """
-/help: prints this menu\n
-/history: prints out the current message history\n
-/create <name>: creates a chatroom with the specified name\n
-/listcr: lists the currently open chatrooms\n
-/joincr <name>: join the chatroom with the specified name\n
-/listusers <chatroom name>: lists the users currently in a chatroom\n
-/send <chatroom name> <message>: send a message to a specific chatroom\n
-/leavecr <name>: leave the chatroom with the specified name\n
-/quit: closes the server\n"""
+/help: prints this menu
+/history: prints out the current message history
+/create <name>: creates a chatroom with the specified name
+/listcr: lists the currently open chatrooms
+/joincr <name>: join the chatroom with the specified name
+/listusers <chatroom name>: lists the users currently in a chatroom
+/send <chatroom name> <message>: send a message to a specific chatroom
+/leavecr <name>: leave the chatroom with the specified name
+/quit: closes the server"""
 
 def main():
     server_socket = socket(AF_INET, SOCK_STREAM)

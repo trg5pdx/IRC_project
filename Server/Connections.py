@@ -31,76 +31,95 @@ class connections:
             self.client_socket.send(closing_message.encode())
             thread.exit()
 
-    def receive_message(self, server_chatrooms, lock, user_list):
+    def receive_message(self, server_chatrooms, lock, user_list, active):
         response = ""
-        disconnecting = False
-
-        # Flags for processing incoming packets, primarily for telling function
-        # how to interpret header lines and the message attached
         
-        while not disconnecting: 
+        while active: 
             response = self.client_socket.recv(1024).decode()
             individual_packets = response.split("trgIRC/0.1")
 
             for i in individual_packets:
                 if len(i) > 0:
-                    msgchr = False
+                    # Flags for processing incoming packets, primarily for telling function
+                    # how to interpret header lines and the message attached
                     msg_header = False
+                    listcr_cmd = False
+                    create_cmd = False
+                    joincr_cmd = False
+                    listme_cmd = False
+                    leavcr_cmd = False
+                    msgchr_cmd = False
                     selected_room = ""
                     user_message = ""
                     packet_lines = i.splitlines()
                     for j in packet_lines:
                         if not msg_header:
-                            client_command = j.split()
-                            match client_command[0]:
-                                case "HELP":
-                                    help_message = "trgIRC/0.1 HELP OK\n"
-                                    help_message += "MESSAGE\n"
-                                    help_message += print_help()
-                                    self.client_socket.send(help_message.encode())
+                            command = j.split()
+                            match command[0]:
                                 case "LISTCR":
-                                    # Look at having list_rooms throw an exception when 
-                                    # there aren't any rooms
-                                    self.__list_chatrooms(server_chatrooms)
+                                    listcr_cmd = True
                                 case "CREATE":
-                                    if len(client_command) > 1:
-                                        self.__create_chatroom(server_chatrooms, client_command[1])
+                                    create_cmd = True
                                 case "JOINCR":
-                                    if len(client_command) > 1:
-                                        # Come back and improve the error handling here
-                                        self.__join_chatroom(server_chatrooms, client_command[1], lock)
+                                    joincr_cmd = True 
                                 case "LISTME":
-                                    if len(client_command) > 2 and client_command[1] == "REQUEST":
-                                        self.__list_users_in_chatroom(server_chatrooms, client_command[2])
+                                    listme_cmd = True
                                 case "LEAVCR":
-                                    if len(client_command) > 1:
-                                        self.__leave_chatroom(client_command[1], lock)
+                                    leavcr_cmd = True
                                 case "MSGCHR":
-                                    if len(client_command) > 2:
-                                        msgchr = True
-                                        selected_room = client_command[2]
+                                    msgchr_cmd = True
                                 case "DSCTCL":
                                     self.__disconnecting(server_chatrooms, lock, user_list)
-                                    disconnecting = True
+                                    return
                                 case "MESSAGE":
                                     msg_header = True
+                                case "REQUEST":
+                                    # Doing this to check that the formattings correct
+                                    if (not listcr_cmd or not leavcr_cmd or
+                                        not create_cmd or not joincr_cmd or
+                                        not listme_cmd):
+                                        self.__send_misc_error()
+                                        break
+                                case "SEND":
+                                    if not msgchr_cmd:
+                                        self.__send_misc_error()
+                                        break
+                                case "ROOM":
+                                    if len(command) > 1:
+                                        selected_room = command[1]
+                                    else:
+                                        self.__send_misc_error()
+                                        break
                                 case other:
                                     self.__send_misc_error()
+                                    break
+
                         else:
-                            if msg_header and msgchr:
+                            if msgchr_cmd:
                                 user_message += j
-                
-                    if msg_header and msgchr:
+                            else:
+                                self.__send_misc_error()
+                                break
+                    if listcr_cmd:
+                        self.__list_chatrooms(server_chatrooms)
+                    if create_cmd:
+                        self.__create_chatroom(server_chatrooms, selected_room) 
+                    if joincr_cmd:
+                        self.__join_chatroom(server_chatrooms, selected_room, lock)
+                    if listme_cmd:
+                        self.__list_users_in_chatroom(server_chatrooms, selected_room)
+                    if leavcr_cmd:
+                        self.__leave_chatroom(selected_room, lock)
+                    if msgchr_cmd:
                         self.__send_message_to_chatroom(
                                 server_chatrooms, lock, 
                                 selected_room, user_message) 
-                 
-
     def __send_misc_error(self):
         error = "trgIRC/0.1 OTHER ERROR\n"
         error += "ERROR FORMAT\n"
         self.client_socket.send(error.encode())
-
+    
+    # Maybe come back and have it return an error for no chatrooms?
     def __list_chatrooms(self, server_chatrooms):
         rooms = list_rooms(server_chatrooms)
         output = "trgIRC/0.1 LISTCR OK\n"
@@ -116,6 +135,7 @@ class connections:
         else:
             output = "trgIRC/0.1 CREATE ERROR\n"
             output += "ERROR ROOMEXISTS\n"
+            output += "ROOM " + new_room_name + "\n"
         self.client_socket.send(output.encode())
 
     def __join_chatroom(self, server_chatrooms, room_name, lock):
@@ -133,6 +153,7 @@ class connections:
         if not joined:
             output = "trgIRC/0.1 JOINCR ERROR\n"
             output += "ERROR NOTFOUND\n"
+            output += "ROOM " + room_name + "\n"
             self.client_socket.send(output.encode())
 
     def __list_users_in_chatroom(self, server_chatrooms, room_name):
@@ -145,7 +166,6 @@ class connections:
                 print("USERS: " + users + "\n")
                 output = "trgIRC/0.1 LISTME OK\n"
                 output += "ROOM " + i.name + "\n"
-                # Maybe send back the room name for the client?
                 output += "MESSAGE\n"
                 output += users
                 print("output: " + output + "\n")
@@ -153,6 +173,7 @@ class connections:
         if not found:
             output = "trgIRC/0.1 LISTME ERROR\n"
             output += "ERROR NOTFOUND\n"
+            output += "ROOM " + room_name + "\n"
             self.client_socket.send(output.encode())
 
 
@@ -168,15 +189,18 @@ class connections:
                     left_msg = self.name + " has disconnected from: " + i.name
                     i.history.append(left_msg)
                     output = "trgIRC/0.1 LEAVCR OK\n"
+                    output += "ROOM " + room_name + "\n"
                     self.client_socket.send(output.encode())
                 else:
                     output = "trgIRC/0.1 LEAVCR ERROR\n"
                     output += "ERROR LEAVE\n"
+                    output += "ROOM " + room_name + "\n"
                     self.client_socket.send(output.encode())
                 lock.release()
         if not found:
             output = "trgIRC/0.1 LEAVCR ERROR\n"
             output += "ERROR NOTFOUND\n"
+            output += "ROOM " + room_name + "\n"
             self.client_socket.send(output.encode())
 
     def __send_message_to_chatroom(self, server_chatrooms, lock, room_name, user_message):
@@ -193,15 +217,17 @@ class connections:
                         lock.acquire()
                         sent_message = [time.time(), self.name, user_message]
                         i.history.append(sent_message)
-                        lock.release
+                        lock.release()
                 if not joined:
                     found = True
                     output = "trgIRC/0.1 MSGCHR ERROR\n"
                     output += "ERROR NOTJOINED\n"
+                    output += "ROOM " + room_name + "\n"
                     self.client_socket.send(output.encode())
         if not found:
             output = "trgIRC/0.1 MSGCHR ERROR\n"
             output += "ERROR NOTFOUND\n"
+            output += "ROOM " + room_name + "\n"
             self.client_socket.send(output.encode())
 
     def __disconnecting(self, server_chatrooms, lock, user_list):    

@@ -2,11 +2,22 @@
 # Using the TCP client example from the book to get set up
 
 from socket import *
+from threading import Thread, Lock
 import sys
-import threading
 from Receive import *
 
-lock = threading.Condition()
+def print_help():
+    return """
+/help: prints this menu
+/create <name>: creates a chatroom with the specified name
+/listcr: lists the currently open chatrooms
+/joincr <name>: join the chatroom with the specified name
+/listusers <chatroom name>: lists the users currently in a chatroom
+/default <chatroom name>: sets a default chatroom so anything you type without /send
+    would be automatically sent to the set chatroom
+/send <chatroom name> <message>: send a message to a specific chatroom
+/leavecr <name>: leave the chatroom with the specified name
+/quit: closes the server"""
 
 def main():
     client_socket = socket(AF_INET, SOCK_STREAM)
@@ -20,53 +31,58 @@ def main():
 
     client_socket.connect((server_name, server_port))
     name_set = set_username(client_socket)
-    active_connection = True
+    quitting = False 
+    message = "" 
+    default_room = ""
+    lock = Lock()
     
     if not name_set:
         client_socket.close()
         sys.exit()
     
-    threading.Thread(target=receive_server_responses, args=(client_socket, active_connection, lock,), daemon=True).start()
+    server_responses = Thread(target=receive_server_responses, args=(client_socket, lock,), daemon=True)
+    server_responses.start()
 
-    message = "" 
-    default_room = ""
-    quitting = False
-
-    while active_connection:
+    while not quitting:
         message = input()
+        if not server_responses.is_alive():
+            sys.exit()
 
         user_command = message.split(' ', 1)
         
         match user_command[0]:
             case "/help":
-                request = "trgIRC/0.1 HELP\n"
-                client_socket.send(request.encode())
+                print(print_help())
             case "/listcr":
-                request = "trgIRC/0.1 LISTCR\n"
+                request = "trgIRC/0.1 LISTCR REQUEST\n"
                 client_socket.send(request.encode())
             case "/create":
                 if len(user_command) > 1:
-                    request = "trgIRC/0.1 CREATE " + user_command[1] + "\n"
+                    request = "trgIRC/0.1 CREATE REQUEST\n" 
+                    request += "ROOM " + user_command[1] + "\n"
                     client_socket.send(request.encode())
                 else:
-                    print("incorrect number of arguments")
+                    print("Incorrect number of arguments")
             case "/joincr":
                 if len(user_command) > 1:
                     room_names = user_command[1].split()
                     for i in room_names:
-                        request = "trgIRC/0.1 JOINCR " + i + "\n"
+                        request = "trgIRC/0.1 JOINCR REQUEST\n" 
+                        request += "ROOM " + i + "\n"
                         client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")
             case "/leavecr":
                 if len(user_command) > 1:
-                    request = "trgIRC/0.1 LEAVCR " + user_command[1] + "\n"
+                    request = "trgIRC/0.1 LEAVCR REQUEST\n" 
+                    request += "ROOM " + user_command[1] + "\n"
                     client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")
             case "/listusers": 
                 if len(user_command) > 1:
-                    request = "trgIRC/0.1 LISTME REQUEST " + user_command[1] + "\n"
+                    request = "trgIRC/0.1 LISTME REQUEST\n" 
+                    request += "ROOM " + user_command[1] + "\n"
                     client_socket.send(request.encode())
                 else:
                     print("Incorrect number of arguments")
@@ -75,7 +91,8 @@ def main():
                     message_queue = user_command[1].split(';')
                     for i in message_queue:
                         room_message = i.split(' ', 1)
-                        request = "trgIRC/0.1 MSGCHR REQUEST " + room_message[0] + "\n"
+                        request = "trgIRC/0.1 MSGCHR SEND\n" 
+                        request += "ROOM " + room_message[0] + "\n"
                         request += "MESSAGE\n"
                         request += room_message[1]
                         client_socket.send(request.encode())
@@ -102,11 +119,15 @@ def main():
                 client_socket.send("trgIRC/0.1 DSCTCL\n".encode())
                 print("Disconnecting...")
                 lock.acquire()
-                active_connection = False
+                quitting = True 
                 lock.release()
             case other:
                 if len(default_room) > 0:
-                    client_command = "MSGCHR " + default_room + "\n" + message
+                    client_command = "trgIRC/0.1 MSGCHR SEND\n"
+                    client_command += "ROOM " + default_room + "\n"
+                    client_command += "MESSAGE\n"
+                    client_command += message
+
                     client_socket.send(client_command.encode())
                 else:
                     print("Entered invalid input")

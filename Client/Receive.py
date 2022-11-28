@@ -3,8 +3,10 @@ from enum import Enum
 from threading import Thread, Lock
 import time
 
-Error = Enum('Error', ['Null', 'NotFound', 'NotJoined', 'RoomExists', 'Leave', 'Format', 'Other'])
-Cmd = Enum('Cmd', ['Null','ListCR','Create','JoinCR','ListME','LeavCR','Msgchr',])
+Error = Enum('Error', ['Null', 'NotFound', 'NotJoined', 'RoomExists', 
+                       'Empty', 'Leave', 'Format', 'Other',])
+Cmd = Enum('Cmd', ['Null', 'ListCR', 'Create', 'JoinCR', 'ListME',
+                   'LeavCR', 'Msgchr',])
 CmdStatus = Enum('CmdStatus', ['Ok','Error'])
 
 def print_chatroom_list(rooms):
@@ -22,9 +24,6 @@ def print_chatroom_list(rooms):
 
 def print_user_list(users, room):
     user_list = users.split(';')
-    if len(user_list) == 0:
-        return "No users are connected to " + room + "\n"
-    
     output = "Users in " + room + ":\n"
     for i in user_list:
         if i == user_list[-1]:
@@ -44,7 +43,8 @@ def set_username(client_socket):
             client_socket.send(connection_message.encode())
             server_response = client_socket.recv(1024).decode()
             packet_lines = server_response.splitlines() 
-            if packet_lines[0] == "trgIRC/0.1 CONNCT OK" and packet_lines[1] == "MESSAGE":
+            if (packet_lines[0] == "trgIRC/0.1 CONNCT OK" 
+                and packet_lines[1] == "MESSAGE"):
                     print(packet_lines[2])
                     return True
             elif packet_lines[0] == "trgIRC/0.1 CONNCT ERROR":
@@ -69,7 +69,7 @@ def handle_errors(packet_cmd, packet_status, error_str):
                         return Error.RoomExists
                     else:
                         return Error.Null
-                case Cmd.JoinCR | Cmd.ListME:
+                case Cmd.JoinCR:
                     if error_str == "NOTFOUND":
                         return Error.NotFound
                     else:
@@ -86,6 +86,13 @@ def handle_errors(packet_cmd, packet_status, error_str):
                         return Error.NotFound
                     elif error_str == "NOTJOINED":
                         return Error.NotJoined
+                    else:
+                        return Error.Null
+                case Cmd.ListCR | Cmd.ListME:
+                    if error_str == "EMPTY":
+                        return Error.Empty
+                    elif error_str == "NOTFOUND":
+                        return Error.NotFound
                     else:
                         return Error.Null
 
@@ -119,7 +126,8 @@ def receive_server_responses(client_socket, lock):
                 message = "" 
                 output = "" 
 
-                # Not checking CONNCT as that's handled by the accept_connections function
+                # Not checking CONNCT as that's handled by the 
+                # accept_connections function
                 for i in packet_lines:
                     if not msg_header: 
                         line = list(filter(None, i.split()))
@@ -187,6 +195,11 @@ def receive_server_responses(client_socket, lock):
                                 output = "Failed to leave " + room
                             case Error.Format:
                                 output = "Error with packet format"
+                            case Error.Empty:
+                                if Cmd.ListCR:
+                                    output = "No rooms are open"
+                                if Cmd.ListME:
+                                    output = "No users connected to this room"
                             case Error.Other:
                                 output = "Some error has occured"
                 print(output)

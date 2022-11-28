@@ -13,8 +13,8 @@ def print_help():
 /listcr: lists the currently open chatrooms
 /joincr <name>: join the chatroom with the specified name
 /listusers <chatroom name>: lists the users currently in a chatroom
-/default <chatroom name>: sets a default chatroom so anything you type without /send
-    would be automatically sent to the set chatroom
+/default <chatroom name>: sets a default chatroom so anything you type without 
+        /send would be automatically sent to the set chatroom
 /send <chatroom name> <message>: send a message to a specific chatroom
 /leavecr <name>: leave the chatroom with the specified name
 /quit: closes the server"""
@@ -40,7 +40,8 @@ def main():
         client_socket.close()
         sys.exit()
     
-    server_responses = Thread(target=receive_server_responses, args=(client_socket, lock,), daemon=True)
+    server_responses = Thread(target=receive_server_responses, 
+                              args=(client_socket, lock,), daemon=True)
     server_responses.start()
 
     while not quitting:
@@ -101,7 +102,8 @@ def main():
             case "/default":
                 if len(user_command) > 1:
                     default_room = user_command[1]
-                # Getting the chatroom list and checking if the room the user provided is there
+                # Getting the chatroom list and checking if the room the 
+                # user provided is there
                 client_socket.send("trgIRC/0.1 LISTCR\n".encode())
                 server_resp = client_socket.recv(1024).decode()
                 room_list = server_resp.split(";") 
@@ -113,7 +115,7 @@ def main():
                         default_room = chatroom[0]                         
                         print("Default chatroom has been set")
                 if not found:
-                    print("Failed to set default room: Couldn't find the specified chatroom")
+                    print("Failed to set default room: room doesn't exist")
 
             case "/quit":
                 client_socket.send("trgIRC/0.1 DSCTCL\n".encode())

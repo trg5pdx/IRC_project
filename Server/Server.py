@@ -3,8 +3,8 @@
 # starting the server code
 
 from socket import *
+from threading import Thread, Lock
 import sys
-import threading
 from Connections import *
 from Chat import *
 
@@ -14,11 +14,13 @@ from Chat import *
 # Also using this to help with communicating the message between threads
 # https://stackoverflow.com/questions/51242467/communicate-data-between-threads-in-python
 
-lock = threading.Condition()
+lock = Lock() 
 
 def accept_connections(server_socket, server_chatrooms, user_list, active):
     while True:
         connection_socket, addr = server_socket.accept()
+        address = str(addr[0])
+        port = str(addr[1])
         name = ""
         accepted_username = False
         while not accepted_username:
@@ -30,7 +32,9 @@ def accept_connections(server_socket, server_chatrooms, user_list, active):
                     name = username_line[1]
                     found_duplicate = False 
                     for user in user_list:
-                        if user == name:
+                        # Along with checking for duplicates, also preventing
+                        # users from impersonating server messages
+                        if user == name or name == "ServerMessage": 
                             found_duplicate = True
                     if found_duplicate: 
                         name_dup = "trgIRC/0.1 CONNCT ERROR\n"
@@ -43,7 +47,9 @@ def accept_connections(server_socket, server_chatrooms, user_list, active):
                         lock.release()
                         name_ack = "trgIRC/0.1 CONNCT OK\n"
                         name_ack += "MESSAGE\n"
-                        name_ack += "Welcome " + name + " to the IRC server!\n\n"
+                        name_ack += "Welcome " + name + " to the IRC server!\n"
+                        print("User " + name + " (" + address + ":" + port 
+                              + ") " + "has connected")
                         connection_socket.send(name_ack.encode()) 
                 else:
                     message = "trgIRC/0.1 CONNCT ERROR\n"
@@ -54,9 +60,14 @@ def accept_connections(server_socket, server_chatrooms, user_list, active):
                 message = "trgIRC/0.1 CONNCT ERROR\n"
                 message += "ERROR STATUS\n"
                 connection_socket.send(message.encode())
-        client = connections(name, connection_socket)
-        threading.Thread(target=client.send_messages, args=(server_chatrooms, active,), daemon=True).start() 
-        threading.Thread(target=client.receive_message, args=(server_chatrooms, lock, user_list, active,), daemon=True).start()
+        client = connections(name, connection_socket, address, port)
+        sender = Thread(target=client.send_messages, 
+                        args=(server_chatrooms, active,), daemon=True)
+        receiver = Thread(target=client.receive_message, 
+                          args=(server_chatrooms, lock, user_list, active,), 
+                          daemon=True)
+        sender.start()
+        receiver.start()
 
 def print_help():
     return """
@@ -91,9 +102,12 @@ def main():
     
 
     print("Ready to accept connections")
-    # Spinning up another thread to allow for it to accept connections and have the
-    # server be able to run commands on it's own
-    threading.Thread(target=accept_connections, args=(server_socket, server_chatrooms, user_list, active,), daemon=True).start()
+    # Spinning up another thread to allow for it to accept connections and
+    # have the server be able to run commands on it's own
+    connection_handler = Thread(target=accept_connections, 
+                                args=(server_socket, server_chatrooms, 
+                                      user_list, active,), daemon=True)
+    connection_handler.start()
     
     server_command = ""
 
@@ -128,7 +142,8 @@ def main():
             case "/listusers":
                 if len(given_command) > 1:
                     current_room = given_command[1]
-                    users_in_room = list_connected_users(server_chatrooms, current_room)
+                    users_in_room = list_connected_users(server_chatrooms, 
+                                                         current_room)
                     print(users_in_room)
                 else:
                     output = ""

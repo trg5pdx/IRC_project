@@ -1,7 +1,10 @@
+# Made by Thomas Gardner, 2022
+
 from socket import *
 from enum import Enum
 from threading import Thread, Lock
 import time
+import datetime
 
 Error = Enum('Error', ['Null', 'NotFound', 'NotJoined', 'RoomExists', 
                        'Empty', 'Leave', 'Format', 'Other',])
@@ -50,7 +53,7 @@ def set_username(client_socket):
             elif packet_lines[0] == "trgIRC/0.1 CONNCT ERROR":
                 match packet_lines[1]:
                     case "ERROR NAMEDUP":
-                        print("Error, someone on the server is already using that name.")
+                        print("Error, someone is already using that name")
                     case other:
                         print("Error, problem relating to formatting")
         except:
@@ -155,16 +158,17 @@ def receive_server_responses(client_socket, lock):
                             case "ROOM":
                                 room = line[1]
                             case "TIME":
-                                msg_time = line[1]
+                                msg_time = float(line[1])
                             case "ERROR":
-                                errors = handle_errors(packet_cmd, packet_status, line[1])
+                                errors = handle_errors(packet_cmd, 
+                                                       packet_status, line[1])
                             case "MESSAGE":
                                 msg_header = True
                             case "DSCTSV":
                                 lock.acquire()
                                 active_connection = False
                                 lock.release()
-                                print("Server has disconnected from the client, shutting down...")
+                                print("Server has disconnected, shutting down...")
                                 thread.exit()
                     else:
                         message += i
@@ -180,7 +184,10 @@ def receive_server_responses(client_socket, lock):
                             case Cmd.ListME:
                                 output = print_user_list(message, room)    
                             case Cmd.Msgchr:
-                                output = "[" + room + "]" + username + ": " + message
+                                converted_time = datetime.datetime.fromtimestamp(msg_time)
+                                timestamp = converted_time.strftime('%I:%M%p')
+                                output = ("[" + timestamp + "]" + "[" + room + 
+                                          "]" + username + ": " + message)
                             case Cmd.Create:
                                 output = "Successfully created " + room
                     case CmdStatus.Error:
@@ -188,7 +195,8 @@ def receive_server_responses(client_socket, lock):
                             case Error.NotFound:
                                 output = "Couldn't find " + room
                             case Error.NotJoined:
-                                output = "Couldn't send message, not connected to " + room
+                                output = ("Can't send message, not connected to "
+                                            + room)
                             case Error.RoomExists:
                                 output = room + " already exists"
                             case Error.Leave:

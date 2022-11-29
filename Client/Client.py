@@ -22,7 +22,7 @@ def print_help():
 def main():
     client_socket = socket(AF_INET, SOCK_STREAM)
     server_name = 'localhost'
-    server_port = 45876 
+    server_port = 45870
         
     if len(sys.argv) > 1 and len(sys.argv) < 4:
         server_host = sys.argv[1]

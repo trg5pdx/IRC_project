@@ -45,9 +45,9 @@ def accept_connections(server_socket, server_chatrooms, user_list, active):
                         lock.acquire()
                         user_list.append(name)
                         lock.release()
-                        name_ack = "trgIRC/0.1 CONNCT OK\n"
-                        name_ack += "MESSAGE\n"
-                        name_ack += "Welcome " + name + " to the IRC server!\n"
+                        name_ack = ("trgIRC/0.1 CONNCT OK\n" +
+                                "MESSAGE\n" +
+                                "Welcome " + name + " to the IRC server!\n")
                         print("User " + name + " (" + address + ":" + port 
                               + ") " + "has connected")
                         connection_socket.send(name_ack.encode()) 
@@ -86,7 +86,7 @@ def main():
     
     # default server host and port if none are specified
     server_host = 'localhost'
-    server_port = 45876 
+    server_port = 45870
     
     if len(sys.argv) > 1 and len(sys.argv) < 4:
         server_host = sys.argv[1]

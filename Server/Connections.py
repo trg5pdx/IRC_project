@@ -40,7 +40,7 @@ class connections:
                 self.client_socket.sendall(closing_message.encode())
                 thread.exit()
         except Exception as e:
-            print("Exception: % failed to send message to client")
+            print("Exception: % failed to send message to client", e)
             self.__disconnecting(server_chatrooms, lock, user_list)
 
     def receive_message(self, server_chatrooms, lock, user_list, active):
@@ -150,7 +150,7 @@ class connections:
                         "MESSAGE\n" + 
                         rooms)
             else:
-                output = (*"trgIRC/0.1 LISTCR ERROR\n" +
+                output = ("trgIRC/0.1 LISTCR ERROR\n" +
                         "ERROR EMPTY\n")
             self.client_socket.send(output.encode())
         except Exception as e:
@@ -191,7 +191,7 @@ class connections:
                             "ROOM " + i.name + "\n")
                     self.client_socket.send(output.encode())
             if not joined:
-                output = "trgIRC/0.1 JOINCR ERROR\n" +
+                output = ("trgIRC/0.1 JOINCR ERROR\n" +
                         "ERROR NOTFOUND\n" +
                         "ROOM " + room_name + "\n")
                 self.client_socket.sendall(output.encode())

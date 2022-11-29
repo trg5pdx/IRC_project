@@ -1,3 +1,5 @@
+# Made by Thomas Gardner, 2022
+
 from socket import *
 import threading
 import time

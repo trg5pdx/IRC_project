@@ -7,7 +7,7 @@ from Server import *
 from Chat import *
 
 Cmd = Enum('Cmd', ['Null', 'ListCR', 'Create', 'JoinCR', 'ListME', 
-                   'LeavCR', 'Msgchr',])
+                   'LeavCR', 'Msgchr', 'Alive'])
 
 class connections:
     def __init__(self, name, client_socket, address, port):
@@ -16,10 +16,11 @@ class connections:
         self.client_socket = client_socket
         self.address = address
         self.port = port
+        self.is_active = True
 
-    def send_messages(self, server_chatrooms, active):
+    def send_messages(self, server_chatrooms, lock, user_list, server_active):
         try:
-            while active:
+            while server_active and self.is_active:
                 for rooms in server_chatrooms:
                     for user_room in self.rooms:
                         if (user_room[0] == rooms.name 
@@ -35,18 +36,20 @@ class connections:
                                 self.client_socket.sendall(message.encode())
                                 i += 1
                             user_room[1] = i
-            if not active:
+            if not server_active:
                 closing_message = "trgIRC/0.1 DSCTSV\n"
                 self.client_socket.sendall(closing_message.encode())
-                thread.exit()
+                return
+            if not self.is_active:
+                return
         except Exception as e:
-            print("Exception: % failed to send message to client", e)
+            print("Exception: ({}) failed to send message to client".format(e))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def receive_message(self, server_chatrooms, lock, user_list, active):
+    def receive_message(self, server_chatrooms, lock, user_list, server_active):
         response = ""
         
-        while active: 
+        while server_active and self.is_active: 
             try:
                 response = self.client_socket.recv(1024).decode()
                 individual_packets = response.split("trgIRC/0.1")
@@ -74,6 +77,8 @@ class connections:
                                         packet_cmd = Cmd.LeavCR
                                     case "MSGCHR":
                                         packet_cmd = Cmd.Msgchr
+                                    case "ALIVE":
+                                        packet_cmd = Cmd.Alive
                                     case "DSCTCL":
                                         self.__disconnecting(server_chatrooms, 
                                                              lock, user_list)
@@ -83,65 +88,68 @@ class connections:
                                     case "REQUEST":
                                         # Doing this to check the formatting
                                         if packet_cmd == Cmd.Null:
-                                            self.__send_misc_error()
+                                            self.__send_misc_error(lock, user_list)
                                             break
                                     case "SEND":
                                         if packet_cmd != Cmd.Msgchr:
-                                            self.__send_misc_error()
+                                            self.__send_misc_error(lock, user_list)
                                             break
                                     case "ROOM":
                                         if len(command) > 1:
                                             selected_room = command[1]
                                         else:
-                                            self.__send_misc_error()
+                                            self.__send_misc_error(lock, user_list)
                                             break
                                     case other:
-                                        self.__send_misc_error()
+                                        self.__send_misc_error(lock, user_list)
                                         break
-
                             else:
                                 if packet_cmd == Cmd.Msgchr:
                                     user_message += j
                                 else:
-                                    self.__send_misc_error()
+                                    self.__send_misc_error(lock, user_list)
                                     break
                         match packet_cmd:
                             case Cmd.ListCR:
-                                self.__list_chatrooms(server_chatrooms)
+                                self.__list_chatrooms(server_chatrooms, lock, user_list)
                             case Cmd.Create:
-                                self.__create_chatroom(server_chatrooms, 
-                                                       selected_room) 
+                                self.__create_chatroom(server_chatrooms, user_list, 
+                                                       lock, selected_room) 
                             case Cmd.JoinCR:
-                                self.__join_chatroom(server_chatrooms, 
+                                self.__join_chatroom(server_chatrooms, user_list,
                                                      selected_room, lock)
                             case Cmd.ListME:
-                                self.__list_users_in_chatroom(server_chatrooms, 
-                                                              selected_room)
+                                self.__list_users_in_chatroom(server_chatrooms, user_list,
+                                                              selected_room, lock)
                             case Cmd.LeavCR:
-                                self.__leave_chatroom(server_chatrooms, 
+                                self.__leave_chatroom(server_chatrooms, user_list,
                                                       selected_room, lock)
                             case Cmd.Msgchr:
                                 self.__send_message_to_chatroom(
-                                        server_chatrooms, lock, 
+                                        server_chatrooms, user_list, lock, 
                                         selected_room, user_message) 
+                            case Cmd.Alive:
+                                alive_ping = "trgIRC/0.1 ALIVE OK\n"
+                                self.client_socket.send(alive_ping.encode())
                             case Cmd.Null:
-                                self.__send_misc_error()
+                                self.__send_misc_error(lock, user_list)
             except Exception as e:
-                print("Error: %", e)
-                print("Failed to receive message from client")
+                print("Exception: ({}) failed to receive message from client".format(e))
                 self.__disconnecting(server_chatrooms, lock, user_list)
+        if not self.is_active:
+            return
 
-    def __send_misc_error(self):
+    def __send_misc_error(self, lock, user_list):
         try:
             error = ("trgIRC/0.1 OTHER ERROR\n" +
                     "ERROR FORMAT\n")
             self.client_socket.sendall(error.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
+            print("Exception: %; Failed to send message to client"%(e))
             print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
     
-    def __list_chatrooms(self, server_chatrooms):
+    def __list_chatrooms(self, server_chatrooms, lock, user_list):
         try:
             rooms = list_rooms(server_chatrooms)
             output = ""
@@ -154,11 +162,11 @@ class connections:
                         "ERROR EMPTY\n")
             self.client_socket.send(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def __create_chatroom(self, server_chatrooms, new_room_name):
+    def __create_chatroom(self, server_chatrooms, user_list, lock, new_room_name):
         try:
             created = add_new_room(server_chatrooms, lock, new_room_name)
             output = ""
@@ -171,11 +179,11 @@ class connections:
                         "ROOM " + new_room_name + "\n")
             self.client_socket.sendall(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def __join_chatroom(self, server_chatrooms, room_name, lock):
+    def __join_chatroom(self, server_chatrooms, user_list, room_name, lock):
         joined = False
         try:
             for i in server_chatrooms:
@@ -196,11 +204,11 @@ class connections:
                         "ROOM " + room_name + "\n")
                 self.client_socket.sendall(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def __list_users_in_chatroom(self, server_chatrooms, room_name):
+    def __list_users_in_chatroom(self, server_chatrooms, user_list, room_name, lock):
         found = False
         output = ""
         try:
@@ -223,11 +231,11 @@ class connections:
                 output += "ROOM " + room_name + "\n"
             self.client_socket.sendall(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def __leave_chatroom(self, server_chatrooms, room_name, lock):
+    def __leave_chatroom(self, server_chatrooms, user_list, room_name, lock):
         found = False
         try:
             for i in server_chatrooms:
@@ -256,11 +264,11 @@ class connections:
                         "ROOM " + room_name + "\n")
                 self.client_socket.sendall(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
-    def __send_message_to_chatroom(self, server_chatrooms, lock, 
+    def __send_message_to_chatroom(self, server_chatrooms, user_list, lock, 
                                    room_name, user_message):
         found = False
         joined = False
@@ -290,28 +298,28 @@ class connections:
                         "ROOM " + room_name + "\n")
                 self.client_socket.send(output.encode())
         except Exception as e:
-            print("Exception: %; Failed to send message to client", e)
-            print("Client: %s (%s:%s)"%(self.name, self.address, self.port))
+            print("Exception: ({}); Failed to send message to client".format(e))
+            print("Client: {} ({}:{})".format(self.name, self.address, self.port))
             self.__disconnecting(server_chatrooms, lock, user_list)
 
     def __disconnecting(self, server_chatrooms, lock, user_list):    
-        lock.acquire()
-        for i in self.rooms:
-            for j in server_chatrooms:
-                if j.name == i[0]:
-                    left = j.leave_chatroom(self.name)
-                    if not left:
-                        # COME BACK TO
-                        print("failed to leave chatroom")
-                        print(j.userlist)
-                    else:
-                        left_msg = self.name + " has disconnected from " + j.name
-                        j.history.append([time.time(), "ServerMessage", left_msg])
-        user_list.remove(self.name)
-        lock.release()
-        self.rooms = []
-        print("User " + self.name + " (" + self.address + ":" + self.port + 
-              ") " + "has disconnected")
-        self.client_socket.close()
-
-
+        if self.is_active:
+            lock.acquire()
+            for i in self.rooms:
+                for j in server_chatrooms:
+                    if j.name == i[0]:
+                        left = j.leave_chatroom(self.name)
+                        if not left:
+                            # COME BACK TO
+                            print("failed to leave chatroom")
+                            print(j.userlist)
+                        else:
+                            left_msg = self.name + " has disconnected from " + j.name
+                            j.history.append([time.time(), "ServerMessage", left_msg])
+            user_list.remove(self.name)
+            lock.release()
+            self.rooms = []
+            print("User " + self.name + " (" + self.address + ":" + self.port + 
+                  ") " + "has disconnected")
+            self.is_active = False
+            self.client_socket.close()

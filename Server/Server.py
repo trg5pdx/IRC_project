@@ -16,58 +16,67 @@ from Chat import *
 
 lock = Lock() 
 
-def accept_connections(server_socket, server_chatrooms, user_list, active):
-    while True:
-        connection_socket, addr = server_socket.accept()
-        address = str(addr[0])
-        port = str(addr[1])
-        name = ""
-        accepted_username = False
-        while not accepted_username:
-            initial_client_command = connection_socket.recv(1024).decode()
-            command = initial_client_command.splitlines()
-            if command[0] == "trgIRC/0.1 CONNCT CLIENT":
-                username_line = command[1].split()
-                if username_line[0] == "USERNAME":
-                    name = username_line[1]
-                    found_duplicate = False 
-                    for user in user_list:
-                        # Along with checking for duplicates, also preventing
-                        # users from impersonating server messages
-                        if user == name or name == "ServerMessage": 
-                            found_duplicate = True
-                    if found_duplicate: 
-                        name_dup = "trgIRC/0.1 CONNCT ERROR\n"
-                        name_dup += "ERROR NAMEDUP\n"
-                        connection_socket.send(name_dup.encode())
-                    else:
-                        accepted_username = True
-                        lock.acquire()
-                        user_list.append(name)
-                        lock.release()
-                        name_ack = ("trgIRC/0.1 CONNCT OK\n" +
+def accept_connections(server_socket, server_chatrooms, user_list, server_active):
+    while server_active:
+        try:
+            connection_socket, addr = server_socket.accept()
+            connection_socket.settimeout(30)
+            address = str(addr[0])
+            port = str(addr[1])
+            name = ""
+            accepted_username = False
+            while not accepted_username:
+                initial_client_command = connection_socket.recv(1024).decode()
+                command = initial_client_command.splitlines()
+                if command[0] == "trgIRC/0.1 CONNCT CLIENT":
+                    username_line = command[1].split()
+                    if username_line[0] == "USERNAME":
+                        name = username_line[1]
+                        found_duplicate = False 
+                        for user in user_list:
+                            # Along with checking for duplicates, also preventing
+                            # users from impersonating server messages
+                            if user == name or name == "ServerMessage": 
+                                found_duplicate = True
+                        if found_duplicate: 
+                            name_dup = "trgIRC/0.1 CONNCT ERROR\n"
+                            name_dup += "ERROR NAMEDUP\n"
+                            connection_socket.sendall(name_dup.encode())
+                        else:
+                            accepted_username = True
+                            lock.acquire()
+                            user_list.append(name)
+                            lock.release()
+                            name_ack = ("trgIRC/0.1 CONNCT OK\n" +
                                 "MESSAGE\n" +
                                 "Welcome " + name + " to the IRC server!\n")
-                        print("User " + name + " (" + address + ":" + port 
-                              + ") " + "has connected")
-                        connection_socket.send(name_ack.encode()) 
-                else:
-                    message = "trgIRC/0.1 CONNCT ERROR\n"
-                    message += "ERROR HEADER\n"
-                    connection_socket.send(message.encode())
+                            print("User " + name + " (" + address + ":" + port 
+                                  + ") " + "has connected")
+                            connection_socket.sendall(name_ack.encode()) 
+                    else:
+                        message = "trgIRC/0.1 OTHER ERROR\n"
+                        message += "ERROR FORMAT\n"
+                        connection_socket.sendall(message.encode())
 
-            else:
-                message = "trgIRC/0.1 CONNCT ERROR\n"
-                message += "ERROR STATUS\n"
-                connection_socket.send(message.encode())
-        client = connections(name, connection_socket, address, port)
-        sender = Thread(target=client.send_messages, 
-                        args=(server_chatrooms, active,), daemon=True)
-        receiver = Thread(target=client.receive_message, 
-                          args=(server_chatrooms, lock, user_list, active,), 
-                          daemon=True)
-        sender.start()
-        receiver.start()
+                else:
+                    message = "trgIRC/0.1 OTHER ERROR\n"
+                    message += "ERROR FORMAT\n"
+                    connection_socket.sendall(message.encode())
+            client = connections(name, connection_socket, address, port)
+            sender = Thread(target=client.send_messages, 
+                            args=(server_chatrooms, lock, user_list, 
+                                  server_active,), 
+                            daemon=True)
+            receiver = Thread(target=client.receive_message, 
+                              args=(server_chatrooms, lock, user_list, 
+                                    server_active,), 
+                              daemon=True)
+            sender.start()
+            receiver.start()
+        except Exception as e:
+            error = ("Exception: ({}) occured when ".format(e) +
+                     "client was attempting to connect")
+            print(error)
 
 def print_help():
     return """
@@ -98,7 +107,7 @@ def main():
 
     server_chatrooms = []
     user_list = []
-    active = True
+    server_active = True
     
 
     print("Ready to accept connections")
@@ -106,12 +115,12 @@ def main():
     # have the server be able to run commands on it's own
     connection_handler = Thread(target=accept_connections, 
                                 args=(server_socket, server_chatrooms, 
-                                      user_list, active,), daemon=True)
+                                      user_list, server_active,), daemon=True)
     connection_handler.start()
     
     server_command = ""
 
-    while active:
+    while server_active:
         server_command = input()
         given_command = server_command.split()
 
@@ -156,7 +165,7 @@ def main():
             case "/quit":
                 print("closing server...")
                 lock.acquire()
-                active = False
+                server_active = False
                 lock.release()
             case other:
                 print("Unknown command")

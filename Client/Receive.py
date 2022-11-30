@@ -9,7 +9,7 @@ import datetime
 Error = Enum('Error', ['Null', 'NotFound', 'NotJoined', 'RoomExists', 
                        'Empty', 'Leave', 'Format', 'Other',])
 Cmd = Enum('Cmd', ['Null', 'ListCR', 'Create', 'JoinCR', 'ListME',
-                   'LeavCR', 'Msgchr',])
+                   'LeavCR', 'Msgchr', 'Alive', 'Other'])
 CmdStatus = Enum('CmdStatus', ['Ok','Error'])
 
 def print_chatroom_list(rooms):
@@ -98,6 +98,11 @@ def handle_errors(packet_cmd, packet_status, error_str):
                         return Error.NotFound
                     else:
                         return Error.Null
+                case Cmd.Other:
+                    if error_str == "FORMAT":
+                        return Error.Format
+                    else:
+                        return Error.Null
 
 def set_status(status_code):
     match status_code:
@@ -106,7 +111,7 @@ def set_status(status_code):
         case "ERROR":
             return CmdStatus.Error
         case other:
-            return CmdStatus.Error
+            return CmdStatus.Ok
 
 def receive_server_responses(client_socket, lock):
     while True:
@@ -153,6 +158,12 @@ def receive_server_responses(client_socket, lock):
                             case "MSGCHR":
                                 packet_cmd = Cmd.Msgchr
                                 packet_status = set_status(line[1])
+                            case "ALIVE":
+                                packet_cmd = Cmd.Alive
+                                packet_status = set_status(line[1])
+                            case "OTHER":
+                                packet_cmd = Cmd.Other
+                                packet_status = set_status(line[1])
                             case "USERNAME":
                                 username = line[1]
                             case "ROOM":
@@ -165,9 +176,6 @@ def receive_server_responses(client_socket, lock):
                             case "MESSAGE":
                                 msg_header = True
                             case "DSCTSV":
-                                lock.acquire()
-                                active_connection = False
-                                lock.release()
                                 print("Server has disconnected, shutting down...")
                                 thread.exit()
                     else:
@@ -190,6 +198,8 @@ def receive_server_responses(client_socket, lock):
                                           "]" + username + ": " + message)
                             case Cmd.Create:
                                 output = "Successfully created " + room
+                            case Cmd.Alive:
+                                pass
                     case CmdStatus.Error:
                         match errors:
                             case Error.NotFound:
@@ -204,17 +214,15 @@ def receive_server_responses(client_socket, lock):
                             case Error.Format:
                                 output = "Error with packet format"
                             case Error.Empty:
-                                if Cmd.ListCR:
+                                if packet_cmd == Cmd.ListCR:
                                     output = "No rooms are open"
-                                if Cmd.ListME:
+                                if packet_cmd == Cmd.ListME:
                                     output = "No users connected to this room"
                             case Error.Other:
                                 output = "Some error has occured"
-                print(output)
+                if packet_cmd != Cmd.Alive:
+                    print(output)
         except Exception as e:
             print("An error has occured, closing client, details:")
             print(e)
-            lock.acquire()
-            active_connection = False
-            lock.release()
             return

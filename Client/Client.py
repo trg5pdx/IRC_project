@@ -117,7 +117,6 @@ def main():
                         # ending up in the room name query
                         i = i.strip()
                         room_message = i.split(' ', 1)
-                        print(room_message)
                         request = "trgIRC/0.1 MSGCHR SEND\n" 
                         request += "ROOM " + room_message[0] + "\n"
                         request += "MESSAGE\n"
@@ -133,7 +132,6 @@ def main():
                     server_resp = client_socket.recv(1024).decode()
                     server_message = server_resp.split("MESSAGE") 
                     room_list = server_message[1].split(";")
-                    print(room_list)
                     found = False
                     for i in room_list:
                         chatroom = i.strip().split(":")

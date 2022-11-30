@@ -20,7 +20,6 @@ def accept_connections(server_socket, server_chatrooms, user_list, server_active
     while server_active:
         try:
             connection_socket, addr = server_socket.accept()
-            connection_socket.setblocking(True)
             connection_socket.settimeout(30)
             address = str(addr[0])
             port = str(addr[1])

@@ -322,8 +322,7 @@ class connections:
                     if j.name == i[0]:
                         left = j.leave_chatroom(self.name)
                         if not left:
-                            # COME BACK TO
-                            print("failed to leave chatroom")
+                            print("Error: user {} failed to leave chatroom".format(self.name))
                             print(j.userlist)
                         else:
                             left_msg = self.name + " has disconnected from " + j.name

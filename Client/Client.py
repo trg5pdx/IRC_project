@@ -79,9 +79,11 @@ def main():
                 client_socket.sendall(request.encode())
             case "/create":
                 if len(user_command) > 1:
-                    request = "trgIRC/0.1 CREATE REQUEST\n" 
-                    request += "ROOM " + user_command[1] + "\n"
-                    client_socket.sendall(request.encode())
+                    room_names = user_command[1].split()
+                    for i in room_names:
+                        request = "trgIRC/0.1 CREATE REQUEST\n" 
+                        request += "ROOM " + i + "\n"
+                        client_socket.sendall(request.encode())
                 else:
                     print("Incorrect number of arguments")
             case "/joincr":
@@ -111,9 +113,13 @@ def main():
                 if len(user_command) > 1:
                     message_queue = user_command[1].split(';')
                     for i in message_queue:
+                        # done to strip extra whitespace and prevent it from
+                        # ending up in the room name query
+                        i = i.strip()
                         room_message = i.split(' ', 1)
+                        print(room_message)
                         request = "trgIRC/0.1 MSGCHR SEND\n" 
-                        request += "ROOM " + room_message[0].strip() + "\n"
+                        request += "ROOM " + room_message[0] + "\n"
                         request += "MESSAGE\n"
                         request += room_message[1]
                         client_socket.sendall(request.encode())

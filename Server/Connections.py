@@ -52,6 +52,18 @@ class connections:
         while server_active and self.is_active: 
             try:
                 response = self.client_socket.recv(1024).decode()
+                
+                # Using the response in this link below to handle when the
+                # client process has crashed
+                # https://www.reddit.com/r/learnpython/comments/osoosr/how_do_i_know_when_a_clientsocket_has_disconnected/h6px8el/
+                if not response: 
+                    print("User {} ({}:{}) has disconnected".format(self.name, 
+                                                                      self.address, 
+                                                                      self.port) +
+                          " from the server (likely crashed)")
+                    self.__disconnecting(server_chatrooms, lock, user_list)
+                    return
+
                 individual_packets = response.split("trgIRC/0.1")
 
                 for i in individual_packets:

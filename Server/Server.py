@@ -20,6 +20,7 @@ def accept_connections(server_socket, server_chatrooms, user_list, server_active
     while server_active:
         try:
             connection_socket, addr = server_socket.accept()
+            connection_socket.setblocking(True)
             connection_socket.settimeout(30)
             address = str(addr[0])
             port = str(addr[1])
@@ -41,7 +42,7 @@ def accept_connections(server_socket, server_chatrooms, user_list, server_active
                         if found_duplicate: 
                             name_dup = "trgIRC/0.1 CONNCT ERROR\n"
                             name_dup += "ERROR NAMEDUP\n"
-                            connection_socket.sendall(name_dup.encode())
+                            connection_socket.send(name_dup.encode())
                         else:
                             accepted_username = True
                             lock.acquire()
@@ -52,16 +53,16 @@ def accept_connections(server_socket, server_chatrooms, user_list, server_active
                                 "Welcome " + name + " to the IRC server!\n")
                             print("User " + name + " (" + address + ":" + port 
                                   + ") " + "has connected")
-                            connection_socket.sendall(name_ack.encode()) 
+                            connection_socket.send(name_ack.encode()) 
                     else:
                         message = "trgIRC/0.1 OTHER ERROR\n"
                         message += "ERROR FORMAT\n"
-                        connection_socket.sendall(message.encode())
+                        connection_socket.send(message.encode())
 
                 else:
                     message = "trgIRC/0.1 OTHER ERROR\n"
                     message += "ERROR FORMAT\n"
-                    connection_socket.sendall(message.encode())
+                    connection_socket.send(message.encode())
             client = connections(name, connection_socket, address, port)
             sender = Thread(target=client.send_messages, 
                             args=(server_chatrooms, lock, user_list, 
